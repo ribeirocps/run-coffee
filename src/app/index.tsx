@@ -1,10 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,6 +21,7 @@ import { WebView } from 'react-native-webview';
 
 const STORAGE_CAFES_KEY = '@runcoffee_cafes';
 const STORAGE_PROFILE_KEY = '@runcoffee_profile';
+const STORAGE_ONBOARDING_KEY = '@runcoffee_onboarding_done';
 
 const INITIAL_CAFES = [
   {
@@ -104,19 +107,93 @@ const CIRCUITS = [
 
 const INITIAL_PROFILE = {
   name: 'Henrique',
+  avatar: '🏃‍♂️',
+  photoUri: null as string | null,
   totalKm: 14.2,
   crownsCount: 1,
   medals: ['🏅 Pioneiro RunCoffee'],
 };
 
+// POSTS INICIAIS DO FEED DA COMUNIDADE EM CAMPINAS
+const INITIAL_POSTS = [
+  {
+    id: 'p1',
+    authorName: 'Henrique Ribeiro',
+    authorAvatar: '🏃‍♂️',
+    timeAgo: 'Há 18 min',
+    action: 'Completou o Circuito Centro-Bosque',
+    stats: '📍 3.2 km • ⏱️ 21 min • ⚡ 6\'33"/km',
+    comment: 'Treino matinal fechado com chave de ouro e espresso no balcão! ☕🔥',
+    badge: '🏅 Medalha Centro-Bosque',
+    cheersCount: 14,
+    userHasCheered: false,
+  },
+  {
+    id: 'p2',
+    authorName: 'Mariana Silva',
+    authorAvatar: '🏃‍♀️',
+    timeAgo: 'Há 45 min',
+    action: 'Assumiu o Trono do Café Container! 👑',
+    stats: '📍 2.8 km • ☕ Check-in de Corrida (+2 visitas)',
+    comment: 'Passei o Pedro e agora sou a nova Rainha do Cambuí! Quem vai encarar?',
+    badge: null,
+    cheersCount: 22,
+    userHasCheered: false,
+  },
+  {
+    id: 'p3',
+    authorName: 'Lucas Mendes',
+    authorAvatar: '⚡',
+    timeAgo: 'Há 2 horas',
+    action: 'Defendeu o Reinado na D.Origem',
+    stats: '📍 4.5 km a pé pelo Centro',
+    comment: 'Café filtrado na V60 depois de subir a Cesarino no trote.',
+    badge: null,
+    cheersCount: 9,
+    userHasCheered: false,
+  },
+];
+
+const ONBOARDING_SLIDES = [
+  {
+    id: '1',
+    icon: '☕🗺️',
+    title: 'Descubra Cafés Especiais',
+    subtitle: 'As melhores cafeterias artesanais de Campinas mapeadas em um circuito urbano feito para quem valoriza café de verdade.',
+  },
+  {
+    id: '2',
+    icon: '🏃‍♂️⚡',
+    title: 'Corra ou Caminhe até Eles',
+    subtitle: 'Trace trajetos a pé com GPS em tempo real. O velocímetro anti-fraude garante que apenas quem foi a pé ganhe o bônus esportivo (+2 visitas)!',
+  },
+  {
+    id: '3',
+    icon: '👑🎁',
+    title: 'Conquiste o Trono & Benefícios',
+    subtitle: 'Frequente com constância para destronar o Rei da cafeteria, colecionar medalhas e resgatar descontos exclusivos no balcão.',
+  },
+];
+
 export default function App() {
-  // Aba Ativa: 'map' | 'circuits' | 'profile'
-  const [activeTab, setActiveTab] = useState<'map' | 'circuits' | 'profile'>('map');
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [signupName, setSignupName] = useState('Henrique');
+  const [signupAvatar, setSignupAvatar] = useState('🏃‍♂️');
+  const [signupPhotoUri, setSignupPhotoUri] = useState<string | null>(null);
+
+  // 4 ABAS: 'map' | 'circuits' | 'community' | 'profile'
+  const [activeTab, setActiveTab] = useState<'map' | 'circuits' | 'community' | 'profile'>('map');
 
   const [cafes, setCafes] = useState(INITIAL_CAFES);
   const [userProfile, setUserProfile] = useState(INITIAL_PROFILE);
   const [selectedCafe, setSelectedCafe] = useState<any>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Estados da Comunidade
+  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [isEventAttending, setIsEventAttending] = useState(false);
+  const [eventAttendeesCount, setEventAttendeesCount] = useState(24);
 
   // Rotas e Circuitos
   const [activeRoute, setActiveRoute] = useState<{
@@ -163,6 +240,9 @@ export default function App() {
   useEffect(() => {
     const loadStoredData = async () => {
       try {
+        const hasDoneOnboarding = await AsyncStorage.getItem(STORAGE_ONBOARDING_KEY);
+        setOnboardingDone(hasDoneOnboarding === 'true');
+
         const savedCafes = await AsyncStorage.getItem(STORAGE_CAFES_KEY);
         const savedProfile = await AsyncStorage.getItem(STORAGE_PROFILE_KEY);
 
@@ -173,6 +253,9 @@ export default function App() {
             ...parsed,
             medals: Array.isArray(parsed.medals) ? parsed.medals : ['🏅 Pioneiro RunCoffee'],
           });
+          if (parsed.name) setSignupName(parsed.name);
+          if (parsed.avatar) setSignupAvatar(parsed.avatar);
+          if (parsed.photoUri) setSignupPhotoUri(parsed.photoUri);
         }
       } catch (e) {
         console.error('Erro ao carregar dados:', e);
@@ -188,6 +271,42 @@ export default function App() {
     } catch (e) {
       console.error('Erro ao salvar dados:', e);
     }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão Necessária', 'Permita o acesso à galeria para escolher sua foto.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      const uri = result.assets[0].uri;
+      setSignupPhotoUri(uri);
+      const updated = { ...userProfile, photoUri: uri };
+      setUserProfile(updated);
+      persistData(cafes, updated);
+    }
+  };
+
+  const handleFinishOnboarding = async () => {
+    const updatedProfile = {
+      ...userProfile,
+      name: signupName.trim() || 'Corredor',
+      avatar: signupAvatar,
+      photoUri: signupPhotoUri,
+    };
+    setUserProfile(updatedProfile);
+    await AsyncStorage.setItem(STORAGE_ONBOARDING_KEY, 'true');
+    await AsyncStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(updatedProfile));
+    setOnboardingDone(true);
   };
 
   useEffect(() => {
@@ -215,7 +334,6 @@ export default function App() {
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
         body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #f8f9fa; }
-        
         .coffee-pin {
           background: #ffffff;
           border: 2px solid #7f4f24;
@@ -227,7 +345,6 @@ export default function App() {
           height: 32px !important;
           box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-
         .user-cup-pin {
           background: #2b1b17;
           border: 3px solid #d4a373;
@@ -240,7 +357,6 @@ export default function App() {
           box-shadow: 0 0 15px rgba(212, 163, 115, 0.8), 0 3px 6px rgba(0,0,0,0.35);
           animation: pulse 2s infinite;
         }
-
         @keyframes pulse {
           0% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0.7); }
           70% { box-shadow: 0 0 0 12px rgba(212, 163, 115, 0); }
@@ -252,21 +368,11 @@ export default function App() {
       <div id="map"></div>
       <script>
         var map = L.map('map', { zoomControl: false }).setView([-22.9025, -47.0535], 15);
-        
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
 
         var cafes = ${JSON.stringify(cafes)};
         cafes.forEach(function(cafe) {
-          var icon = L.divIcon({
-            className: 'coffee-pin',
-            html: '☕',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-          });
-
+          var icon = L.divIcon({ className: 'coffee-pin', html: '☕', iconSize: [32, 32], iconAnchor: [16, 16] });
           var marker = L.marker([cafe.lat, cafe.lng], { icon: icon }).addTo(map);
           marker.on('click', function() {
             if (window.ReactNativeWebView) {
@@ -279,115 +385,61 @@ export default function App() {
         var currentRouteLayer = null;
 
         window.updateUserPosition = function(lat, lng, recenter) {
-          var userIcon = L.divIcon({
-            className: 'user-cup-pin',
-            html: '☕',
-            iconSize: [38, 38],
-            iconAnchor: [19, 19]
-          });
-
+          var userIcon = L.divIcon({ className: 'user-cup-pin', html: '☕', iconSize: [38, 38], iconAnchor: [19, 19] });
           if (!userMarker) {
             userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
           } else {
             userMarker.setLatLng([lat, lng]);
           }
-
-          if (recenter) {
-            map.setView([lat, lng], 16);
-          }
+          if (recenter) map.setView([lat, lng], 16);
         };
 
         window.centerOnUser = function() {
-          if (userMarker) {
-            map.setView(userMarker.getLatLng(), 16);
-          }
+          if (userMarker) map.setView(userMarker.getLatLng(), 16);
         };
 
         window.tracePedestrianRoute = function(startLat, startLng, endLat, endLng) {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
-
+          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
           var url = 'https://router.project-osrm.org/route/v1/foot/' + startLng + ',' + startLat + ';' + endLng + ',' + endLat + '?overview=full&geometries=geojson';
-
-          fetch(url)
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (data.routes && data.routes.length > 0) {
-                var route = data.routes[0];
-                var coordinates = route.geometry.coordinates.map(function(c) {
-                  return [c[1], c[0]];
-                });
-
-                currentRouteLayer = L.polyline(coordinates, {
-                  color: '#7f4f24',
-                  weight: 5,
-                  opacity: 0.85,
-                  dashArray: '8, 8'
-                }).addTo(map);
-
-                map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
-
-                var distKm = (route.distance / 1000).toFixed(1);
-                var durationMin = Math.max(1, Math.round(route.duration / 60));
-
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'ROUTE_READY',
-                    distance: distKm + ' km',
-                    duration: '~' + durationMin + ' min'
-                  }));
-                }
-              }
-            })
-            .catch(function(err) {
-              var coords = [[startLat, startLng], [endLat, endLng]];
-              currentRouteLayer = L.polyline(coords, { color: '#7f4f24', weight: 4, dashArray: '5, 5' }).addTo(map);
+          fetch(url).then(function(res) { return res.json(); }).then(function(data) {
+            if (data.routes && data.routes.length > 0) {
+              var route = data.routes[0];
+              var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+              currentRouteLayer = L.polyline(coordinates, { color: '#7f4f24', weight: 5, opacity: 0.85, dashArray: '8, 8' }).addTo(map);
               map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
-            });
+              var distKm = (route.distance / 1000).toFixed(1);
+              var durationMin = Math.max(1, Math.round(route.duration / 60));
+              if (window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ROUTE_READY', distance: distKm + ' km', duration: '~' + durationMin + ' min' }));
+              }
+            }
+          }).catch(function() {
+            var coords = [[startLat, startLng], [endLat, endLng]];
+            currentRouteLayer = L.polyline(coords, { color: '#7f4f24', weight: 4, dashArray: '5, 5' }).addTo(map);
+            map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
+          });
         };
 
         window.traceCircuitRoute = function(waypoints) {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
-
+          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
           var coordString = waypoints.map(function(w) { return w.lng + ',' + w.lat; }).join(';');
           var url = 'https://router.project-osrm.org/route/v1/foot/' + coordString + '?overview=full&geometries=geojson';
-
-          fetch(url)
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (data.routes && data.routes.length > 0) {
-                var route = data.routes[0];
-                var coordinates = route.geometry.coordinates.map(function(c) {
-                  return [c[1], c[0]];
-                });
-
-                currentRouteLayer = L.polyline(coordinates, {
-                  color: '#d4a373',
-                  weight: 6,
-                  opacity: 0.9,
-                  lineJoin: 'round'
-                }).addTo(map);
-
-                map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
-              }
-            })
-            .catch(function(err) {
-              var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
-              currentRouteLayer = L.polyline(coords, { color: '#d4a373', weight: 5 }).addTo(map);
+          fetch(url).then(function(res) { return res.json(); }).then(function(data) {
+            if (data.routes && data.routes.length > 0) {
+              var route = data.routes[0];
+              var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+              currentRouteLayer = L.polyline(coordinates, { color: '#d4a373', weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(map);
               map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
-            });
+            }
+          }).catch(function() {
+            var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
+            currentRouteLayer = L.polyline(coords, { color: '#d4a373', weight: 5 }).addTo(map);
+            map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
+          });
         };
 
         window.removeRoute = function() {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
+          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
         };
       </script>
     </body>
@@ -396,7 +448,6 @@ export default function App() {
 
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
-
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') return;
@@ -407,38 +458,22 @@ export default function App() {
       injectUserCoords(latitude, longitude, true);
 
       locationSubscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 2000,
-          distanceInterval: 3,
-        },
+        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 3 },
         (newLocation) => {
           const { latitude: newLat, longitude: newLng, speed } = newLocation.coords;
           setUserCoords({ lat: newLat, lng: newLng });
           injectUserCoords(newLat, newLng, false);
-
           const speedKmh = Math.max(0, Math.round((speed || 0) * 3.6));
           setCurrentSpeedKmh(speedKmh);
-
-          if (speedKmh > 20) {
-            setIsVehicleDetected(true);
-          }
+          if (speedKmh > 20) setIsVehicleDetected(true);
         }
       );
     })();
-
-    return () => {
-      locationSubscription?.remove();
-    };
-  }, []);
+    return () => { locationSubscription?.remove(); };
+  }, [onboardingDone]);
 
   const injectUserCoords = (lat: number, lng: number, recenter: boolean) => {
-    const script = `
-      if (window.updateUserPosition) {
-        window.updateUserPosition(${lat}, ${lng}, ${recenter});
-      }
-      true;
-    `;
+    const script = `if (window.updateUserPosition) { window.updateUserPosition(${lat}, ${lng}, ${recenter}); } true;`;
     webViewRef.current?.injectJavaScript(script);
   };
 
@@ -454,11 +489,7 @@ export default function App() {
         if (found) setSelectedCafe(found);
       } else if (data.type === 'ROUTE_READY') {
         if (targetCafeRef.current) {
-          setActiveRoute({
-            cafe: targetCafeRef.current,
-            distance: data.distance,
-            duration: data.duration,
-          });
+          setActiveRoute({ cafe: targetCafeRef.current, distance: data.distance, duration: data.duration });
           setIsArrived(false);
           setIsVehicleDetected(false);
         }
@@ -469,19 +500,13 @@ export default function App() {
   };
 
   const handleSelectCircuit = (circuit: any) => {
-    setActiveTab('map'); // Muda para a aba do mapa automaticamente
+    setActiveTab('map');
     setActiveRoute(null);
     setSelectedCafe(null);
     setActiveCircuit(circuit);
     setCircuitCompletedCafeIds([]);
-
     const circuitCafes = cafes.filter((c) => circuit.cafeIds.includes(c.id));
-    const script = `
-      if (window.traceCircuitRoute) {
-        window.traceCircuitRoute(${JSON.stringify(circuitCafes)});
-      }
-      true;
-    `;
+    const script = `if (window.traceCircuitRoute) { window.traceCircuitRoute(${JSON.stringify(circuitCafes)}); } true;`;
     webViewRef.current?.injectJavaScript(script);
   };
 
@@ -494,11 +519,7 @@ export default function App() {
 
   const handleAdvanceCircuitStop = () => {
     if (!activeCircuit) return;
-
-    const nextCafeId = activeCircuit.cafeIds.find(
-      (id: string) => !circuitCompletedCafeIds.includes(id)
-    );
-
+    const nextCafeId = activeCircuit.cafeIds.find((id: string) => !circuitCompletedCafeIds.includes(id));
     if (nextCafeId) {
       const newCompleted = [...circuitCompletedCafeIds, nextCafeId];
       setCircuitCompletedCafeIds(newCompleted);
@@ -506,7 +527,6 @@ export default function App() {
       if (newCompleted.length === activeCircuit.cafeIds.length) {
         const medalWon = activeCircuit.badge;
         setUnlockedMedal(medalWon);
-
         const currentMedals = Array.isArray(userProfile.medals) ? userProfile.medals : ['🏅 Pioneiro RunCoffee'];
         const updatedMedals = currentMedals.includes(medalWon) ? currentMedals : [...currentMedals, medalWon];
         const addedKm = parseFloat(activeCircuit.distance) || 3.0;
@@ -516,28 +536,32 @@ export default function App() {
           totalKm: parseFloat(((userProfile.totalKm || 0) + addedKm).toFixed(1)),
           medals: updatedMedals,
         };
-
         setUserProfile(updatedProfile);
         persistData(cafes, updatedProfile);
+
+        // Adiciona post automático na comunidade
+        const newPost = {
+          id: String(Date.now()),
+          authorName: userProfile.name,
+          authorAvatar: userProfile.avatar || '🏃‍♂️',
+          timeAgo: 'Agora mesmo',
+          action: `Completou o ${activeCircuit.title}! 🏆`,
+          stats: `📍 ${activeCircuit.distance} • Desafio Oficial`,
+          comment: `Faturei a ${medalWon}! Rota incrível pelas cafeterias de Campinas.`,
+          badge: medalWon,
+          cheersCount: 1,
+          userHasCheered: true,
+        };
+        setPosts((prev) => [newPost, ...prev]);
       }
     }
   };
 
   const handleStartRoute = (cafe: any) => {
-    if (!userCoords) {
-      Alert.alert('Aguardando GPS', 'Obtendo sinal do GPS...');
-      return;
-    }
-
+    if (!userCoords) { Alert.alert('Aguardando GPS', 'Obtendo sinal...'); return; }
     setActiveCircuit(null);
     targetCafeRef.current = cafe;
-
-    const script = `
-      if (window.tracePedestrianRoute) {
-        window.tracePedestrianRoute(${userCoords.lat}, ${userCoords.lng}, ${cafe.lat}, ${cafe.lng});
-      }
-      true;
-    `;
+    const script = `if (window.tracePedestrianRoute) { window.tracePedestrianRoute(${userCoords.lat}, ${userCoords.lng}, ${cafe.lat}, ${cafe.lng}); } true;`;
     webViewRef.current?.injectJavaScript(script);
     setSelectedCafe(null);
   };
@@ -562,17 +586,12 @@ export default function App() {
   const handleOpenCouponFromRoute = () => {
     if (activeRoute?.cafe) {
       setRedeemingCafe(activeRoute.cafe);
-
       if (isVehicleDetected) {
         setRedeemPointsToAdd(1);
-        Alert.alert(
-          '🚗 Deslocamento Rápido Detectado!',
-          'Seu percurso registrou velocidade acima de 20 km/h. Validado como Check-in Avulso (+1 Visita).'
-        );
+        Alert.alert('🚗 Deslocamento Rápido!', 'Velocidade > 20 km/h. Validado como Check-in Avulso (+1 Visita).');
       } else {
         setRedeemPointsToAdd(2);
       }
-
       setCountdown(90);
       setShowCouponModal(true);
     }
@@ -580,15 +599,12 @@ export default function App() {
 
   const handleCompleteRedemption = () => {
     setShowCouponModal(false);
-
     if (redeemingCafe) {
       const targetCafe = redeemingCafe;
       const isAlreadyKing = targetCafe.kingName === userProfile.name;
       const newMyVisits = targetCafe.myVisits + redeemPointsToAdd;
-
       let newKingName = targetCafe.kingName;
       let newKingVisits = targetCafe.kingVisits;
-
       const kmToAdd = redeemPointsToAdd === 2 ? 1.8 : 0;
 
       let updatedProfile = {
@@ -600,34 +616,63 @@ export default function App() {
         newKingName = userProfile.name;
         newKingVisits = newMyVisits;
         updatedProfile.crownsCount += 1;
-
-        setCrownVictoryData({
-          cafeName: targetCafe.name,
-          oldKing: targetCafe.kingName,
-          newVisits: newMyVisits,
-        });
+        setCrownVictoryData({ cafeName: targetCafe.name, oldKing: targetCafe.kingName, newVisits: newMyVisits });
       }
 
       const updatedCafes = cafes.map((c) =>
-        c.id === targetCafe.id
-          ? {
-              ...c,
-              myVisits: newMyVisits,
-              kingName: newKingName,
-              kingVisits: newKingVisits,
-            }
-          : c
+        c.id === targetCafe.id ? { ...c, myVisits: newMyVisits, kingName: newKingName, kingVisits: newKingVisits } : c
       );
 
       setUserProfile(updatedProfile);
       setCafes(updatedCafes);
       persistData(updatedCafes, updatedProfile);
-    }
 
-    if (activeRoute) {
-      handleCancelRoute();
+      // Post automático na comunidade
+      const newPost = {
+        id: String(Date.now()),
+        authorName: userProfile.name,
+        authorAvatar: userProfile.avatar || '🏃‍♂️',
+        timeAgo: 'Agora mesmo',
+        action: `Fez check-in em ${targetCafe.name} ☕`,
+        stats: redeemPointsToAdd === 2 ? '🏃 1.8 km a pé • Bônus Corrida (+2 visitas)' : '📍 Check-in Avulso (+1 visita)',
+        comment: `Aproveitando meu desconto de ${targetCafe.perk}!`,
+        badge: null,
+        cheersCount: 1,
+        userHasCheered: true,
+      };
+      setPosts((prev) => [newPost, ...prev]);
     }
+    if (activeRoute) handleCancelRoute();
     setRedeemingCafe(null);
+  };
+
+  // Interação de "Brinde" ☕ no Feed
+  const handleToggleCheers = (postId: string) => {
+    setPosts((prev) =>
+      prev.map((post) => {
+        if (post.id === postId) {
+          const hasCheered = post.userHasCheered;
+          return {
+            ...post,
+            userHasCheered: !hasCheered,
+            cheersCount: hasCheered ? post.cheersCount - 1 : post.cheersCount + 1,
+          };
+        }
+        return post;
+      })
+    );
+  };
+
+  // Confirmar presença no Run Club de Sábado
+  const handleToggleEventAttendance = () => {
+    if (isEventAttending) {
+      setIsEventAttending(false);
+      setEventAttendeesCount((prev) => prev - 1);
+    } else {
+      setIsEventAttending(true);
+      setEventAttendeesCount((prev) => prev + 1);
+      Alert.alert('Presença Confirmada! 🏃‍♂️☕', 'Te esperamos sábado às 08h na Praça Arautos da Paz (Taquaral). Leve sua garrafinha!');
+    }
   };
 
   const handleUseCurrentLocationForCafe = () => {
@@ -643,7 +688,6 @@ export default function App() {
       Alert.alert('Atenção', 'Informe nome e endereço.');
       return;
     }
-
     const newCafe = {
       id: String(Date.now()),
       name: formName.trim(),
@@ -656,46 +700,145 @@ export default function App() {
       perk: formPerk.trim() || '10% de boas-vindas RunCoffee',
       instagram: formInstagram.trim() || '@cafeteria',
     };
-
     const updatedCafes = [...cafes, newCafe];
     setCafes(updatedCafes);
     persistData(updatedCafes, userProfile);
-
-    setFormName('');
-    setFormAddress('');
-    setFormInstagram('');
-    setFormPerk('');
+    setFormName(''); setFormAddress(''); setFormInstagram(''); setFormPerk('');
     setShowAddCafeModal(false);
-
     Alert.alert('Sucesso!', `${newCafe.name} adicionado ao mapa.`);
   };
 
   const handleResetData = () => {
-    Alert.alert(
-      'Resetar Placar',
-      'Deseja resetar os dados de teste?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Resetar',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.clear();
-            setCafes(INITIAL_CAFES);
-            setUserProfile(INITIAL_PROFILE);
-            Alert.alert('Pronto', 'Dados reiniciados.');
-          },
+    Alert.alert('Resetar Placar', 'Deseja resetar os dados de teste?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Resetar',
+        style: 'destructive',
+        onPress: async () => {
+          await AsyncStorage.clear();
+          setCafes(INITIAL_CAFES);
+          setUserProfile(INITIAL_PROFILE);
+          setOnboardingDone(false);
+          setOnboardingStep(0);
+          Alert.alert('Pronto', 'Dados reiniciados e Onboarding liberado.');
         },
-      ]
-    );
+      },
+    ]);
   };
 
+  // =========================================================================
+  // TELA DE ONBOARDING
+  // =========================================================================
+  if (onboardingDone === false) {
+    const isSignupStep = onboardingStep === 3;
+    const currentSlide = ONBOARDING_SLIDES[onboardingStep] || ONBOARDING_SLIDES[0];
+
+    return (
+      <View style={styles.onboardingContainer}>
+        <StatusBar style="light" />
+
+        <View style={styles.onboardingTopBar}>
+          <Text style={styles.onboardingBrand}>RunCoffee ☕🏃</Text>
+          {!isSignupStep && (
+            <TouchableOpacity onPress={() => setOnboardingStep(3)}>
+              <Text style={styles.onboardingSkipText}>Pular</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {!isSignupStep ? (
+          <View style={styles.onboardingSlideContent}>
+            <View style={styles.onboardingIconCircle}>
+              <Text style={styles.onboardingBigIcon}>{currentSlide.icon}</Text>
+            </View>
+            <Text style={styles.onboardingSlideTitle}>{currentSlide.title}</Text>
+            <Text style={styles.onboardingSlideSubtitle}>{currentSlide.subtitle}</Text>
+          </View>
+        ) : (
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            style={styles.onboardingSignupContent}
+          >
+            <Text style={styles.signupBadge}>SEU PERFIL DE ATLETA</Text>
+            <Text style={styles.signupTitle}>Como você quer aparecer no mapa?</Text>
+            <Text style={styles.signupSubtitle}>Sua foto ou ícone aparecerá no topo do Reinado quando assumir o trono.</Text>
+
+            <TouchableOpacity style={styles.photoPickerContainer} onPress={handlePickImage}>
+              {signupPhotoUri ? (
+                <Image source={{ uri: signupPhotoUri }} style={styles.avatarUploadedImg} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                  <Text style={styles.photoPlaceholderText}>Subir Foto</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.signupInput}
+              value={signupName}
+              onChangeText={setSignupName}
+              placeholder="Seu nome ou apelido"
+              placeholderTextColor="#999"
+            />
+
+            {!signupPhotoUri && (
+              <>
+                <Text style={styles.avatarPickerLabel}>Ou escolha um ícone rápido:</Text>
+                <View style={styles.avatarRow}>
+                  {['🏃‍♂️', '🏃‍♀️', '☕', '⚡', '🕶️'].map((av) => (
+                    <TouchableOpacity
+                      key={av}
+                      style={[styles.avatarChoiceBtn, signupAvatar === av ? styles.avatarChoiceSelected : null]}
+                      onPress={() => setSignupAvatar(av)}
+                    >
+                      <Text style={styles.avatarChoiceText}>{av}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+          </KeyboardAvoidingView>
+        )}
+
+        <View style={styles.onboardingFooter}>
+          <View style={styles.dotsRow}>
+            {[0, 1, 2, 3].map((dot) => (
+              <View 
+                key={dot} 
+                style={[styles.dotPill, onboardingStep === dot ? styles.dotPillActive : null]} 
+              />
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={styles.onboardingNextBtn}
+            onPress={() => {
+              if (onboardingStep < 3) {
+                setOnboardingStep(prev => prev + 1);
+              } else {
+                handleFinishOnboarding();
+              }
+            }}
+          >
+            <Text style={styles.onboardingNextBtnText}>
+              {onboardingStep < 3 ? 'Avançar ➔' : 'Entrar no RunCoffee 🚀'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // =========================================================================
+  // APP PRINCIPAL
+  // =========================================================================
   return (
     <View style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-      {/* CABEÇALHO COM IDENTIDADE DO APP */}
+      {/* CABEÇALHO */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
@@ -708,7 +851,6 @@ export default function App() {
         </View>
       </View>
 
-      {/* ÁREA CENTRAL QUE MUDA CONFORME A ABA SELECIONADA */}
       <View style={styles.tabContentArea}>
 
         {/* ==================== ABA 1: MAPA ==================== */}
@@ -726,7 +868,6 @@ export default function App() {
               <Text style={styles.gpsButtonText}>🎯</Text>
             </TouchableOpacity>
 
-            {/* Painel de Circuito Ativo no Mapa */}
             {activeCircuit && (
               <View style={styles.circuitSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -777,7 +918,6 @@ export default function App() {
               </View>
             )}
 
-            {/* Painel de Rota Individual */}
             {!activeCircuit && activeRoute && (
               <View style={styles.activeRouteSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -851,7 +991,6 @@ export default function App() {
               </View>
             )}
 
-            {/* Painel de Cafeteria Clicada */}
             {!activeCircuit && !activeRoute && selectedCafe && (
               <View style={styles.bottomSheet}>
                 <View style={styles.sheetHeader}>
@@ -932,7 +1071,7 @@ export default function App() {
 
                   <View style={styles.circuitCardStopsBox}>
                     <Text style={styles.circuitCardStopsTitle}>Paradas Obrigatórias:</Text>
-                    {circuitCafes.map((c, i) => (
+                    {circuitCafes.map((c) => (
                       <Text key={c.id} style={styles.circuitCardStopText}>
                         • {c.name} ({c.address.split('-')[1]?.trim() || 'Campinas'})
                       </Text>
@@ -953,18 +1092,118 @@ export default function App() {
           </ScrollView>
         )}
 
-        {/* ==================== ABA 3: PERFIL ==================== */}
+        {/* ==================== ABA 3: NOVO! COMUNIDADE (FEED SOCIAL) ==================== */}
+        {activeTab === 'community' && (
+          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
+            {/* CARROSSEL DOS REIS ATUAIS */}
+            <Text style={styles.communitySectionTitle}>👑 Reis de Campinas nesta Semana</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kingsCarousel}>
+              {cafes.map((cafe) => (
+                <View key={cafe.id} style={styles.kingCarouselCard}>
+                  <View style={styles.kingCrownBadge}>
+                    <Text style={{ fontSize: 13 }}>👑</Text>
+                  </View>
+                  <View style={styles.kingAvatarCircle}>
+                    <Text style={{ fontSize: 20 }}>
+                      {cafe.kingName === userProfile.name ? (userProfile.avatar || '🏃‍♂️') : '☕'}
+                    </Text>
+                  </View>
+                  <Text style={styles.kingCardName} numberOfLines={1}>
+                    {cafe.kingName === userProfile.name ? 'Você!' : cafe.kingName}
+                  </Text>
+                  <Text style={styles.kingCardCafe} numberOfLines={1}>{cafe.name.split(' ')[0]}</Text>
+                  <Text style={styles.kingCardVisits}>{cafe.kingVisits} visitas</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* EVENTO RUN CLUB DE SÁBADO */}
+            <View style={styles.eventCard}>
+              <View style={styles.eventHeaderRow}>
+                <Text style={styles.eventTag}>🏃‍♂️ TREINO COLETIVO</Text>
+                <Text style={styles.eventDate}>Sábado • 08h00</Text>
+              </View>
+              <Text style={styles.eventTitle}>Coffee Run Taquaral ➔ Cambuí (5k)</Text>
+              <Text style={styles.eventDesc}>
+                Saída na Praça Arautos da Paz, volta pela lagoa e chegada com café especial e hidratação na Abigail Coffee Co.
+              </Text>
+              <TouchableOpacity 
+                style={[styles.eventAttendBtn, isEventAttending ? styles.eventAttendingActive : null]}
+                onPress={handleToggleEventAttendance}
+              >
+                <Text style={[styles.eventAttendBtnText, isEventAttending ? styles.eventAttendingActiveText : null]}>
+                  {isEventAttending ? '✓ Presença Confirmada!' : `Bora Correr Junto! (${eventAttendeesCount} atletas)`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* FEED DE ATIVIDADES RECENTES */}
+            <Text style={styles.communitySectionTitle}>☕ Atividades Recentes na Cidade</Text>
+            {posts.map((post) => (
+              <View key={post.id} style={styles.feedCard}>
+                <View style={styles.feedCardHeader}>
+                  <View style={styles.feedAvatarCircle}>
+                    <Text style={{ fontSize: 20 }}>{post.authorAvatar}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.feedAuthorName}>{post.authorName}</Text>
+                    <Text style={styles.feedActionText}>{post.action}</Text>
+                  </View>
+                  <Text style={styles.feedTimeAgo}>{post.timeAgo}</Text>
+                </View>
+
+                {post.stats ? (
+                  <View style={styles.feedStatsBox}>
+                    <Text style={styles.feedStatsText}>{post.stats}</Text>
+                  </View>
+                ) : null}
+
+                {post.comment ? (
+                  <Text style={styles.feedCommentText}>"{post.comment}"</Text>
+                ) : null}
+
+                {post.badge ? (
+                  <View style={styles.feedBadgePill}>
+                    <Text style={styles.feedBadgeText}>{post.badge}</Text>
+                  </View>
+                ) : null}
+
+                {/* BOTÃO INTERATIVO DE BRINDE ☕ */}
+                <View style={styles.feedFooterRow}>
+                  <TouchableOpacity 
+                    style={[styles.cheersButton, post.userHasCheered ? styles.cheersButtonActive : null]}
+                    onPress={() => handleToggleCheers(post.id)}
+                  >
+                    <Text style={styles.cheersIcon}>☕</Text>
+                    <Text style={[styles.cheersText, post.userHasCheered ? styles.cheersTextActive : null]}>
+                      {post.userHasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheersCount})
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.feedCityTag}>📍 Campinas, SP</Text>
+                </View>
+              </View>
+            ))}
+            <View style={{ height: 30 }} />
+          </ScrollView>
+        )}
+
+        {/* ==================== ABA 4: PERFIL ==================== */}
         {activeTab === 'profile' && (
           <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
-            {/* Card do Usuário */}
             <View style={styles.profileHeaderCard}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarText}>HR</Text>
-              </View>
+              <TouchableOpacity style={styles.avatarCircle} onPress={handlePickImage}>
+                {userProfile.photoUri ? (
+                  <Image source={{ uri: userProfile.photoUri }} style={styles.avatarProfileImg} />
+                ) : (
+                  <Text style={styles.avatarText}>{userProfile.avatar || '🏃‍♂️'}</Text>
+                )}
+                <View style={styles.editPhotoBadge}>
+                  <Text style={{ fontSize: 10 }}>📷</Text>
+                </View>
+              </TouchableOpacity>
               <Text style={styles.profileBigName}>{userProfile.name}</Text>
               <Text style={styles.profileRoleText}>Coffee Explorer • Campinas</Text>
 
-              {/* Estatísticas Principais */}
               <View style={styles.profileStatsGrid}>
                 <View style={styles.profileGridItem}>
                   <Text style={styles.profileGridVal}>🏃 {userProfile.totalKm}</Text>
@@ -981,7 +1220,7 @@ export default function App() {
               </View>
             </View>
 
-            {/* Sala de Troféus (Medalhas) */}
+            {/* Sala de Troféus */}
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>🏆 Suas Medalhas Conquistadas</Text>
               <View style={styles.medalsWrap}>
@@ -993,7 +1232,7 @@ export default function App() {
               </View>
             </View>
 
-            {/* Cafeterias Onde Você é o Rei */}
+            {/* Cafeterias do Rei */}
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>👑 Seus Reinados em Campinas</Text>
               {cafes.filter((c) => c.kingName === userProfile.name).length > 0 ? (
@@ -1012,7 +1251,16 @@ export default function App() {
               )}
             </View>
 
-            {/* Botão de Reset de Testes */}
+            <TouchableOpacity 
+              style={styles.seeOnboardingBtn}
+              onPress={() => {
+                setOnboardingStep(0);
+                setOnboardingDone(false);
+              }}
+            >
+              <Text style={styles.seeOnboardingBtnText}>✨ Rever Apresentação do App</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity style={styles.resetBtn} onLongPress={handleResetData}>
               <Text style={styles.resetBtnText}>Segure para Resetar Dados de Teste</Text>
             </TouchableOpacity>
@@ -1021,36 +1269,26 @@ export default function App() {
 
       </View>
 
-      {/* ==================== BARRA INFERIOR DE NAVEGAÇÃO (TABS) ==================== */}
+      {/* ==================== BARRA DE NAVEGAÇÃO INFERIOR COM 4 ABAS ==================== */}
       <View style={styles.bottomTabBar}>
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setActiveTab('map')}
-        >
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('map')}>
           <Text style={styles.tabIcon}>🗺️</Text>
-          <Text style={[styles.tabLabel, activeTab === 'map' ? styles.tabLabelActive : null]}>
-            Mapa
-          </Text>
+          <Text style={[styles.tabLabel, activeTab === 'map' ? styles.tabLabelActive : null]}>Mapa</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setActiveTab('circuits')}
-        >
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('circuits')}>
           <Text style={styles.tabIcon}>🏃</Text>
-          <Text style={[styles.tabLabel, activeTab === 'circuits' ? styles.tabLabelActive : null]}>
-            Circuitos
-          </Text>
+          <Text style={[styles.tabLabel, activeTab === 'circuits' ? styles.tabLabelActive : null]}>Circuitos</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.tabItem} 
-          onPress={() => setActiveTab('profile')}
-        >
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('community')}>
+          <Text style={styles.tabIcon}>👥</Text>
+          <Text style={[styles.tabLabel, activeTab === 'community' ? styles.tabLabelActive : null]}>Comunidade</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
           <Text style={styles.tabIcon}>👤</Text>
-          <Text style={[styles.tabLabel, activeTab === 'profile' ? styles.tabLabelActive : null]}>
-            Perfil
-          </Text>
+          <Text style={[styles.tabLabel, activeTab === 'profile' ? styles.tabLabelActive : null]}>Perfil</Text>
         </TouchableOpacity>
       </View>
 
@@ -1074,24 +1312,21 @@ export default function App() {
               <Text style={styles.timerSub}>Válido apenas enquanto o relógio estiver ativo</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.confirmRedeemBtn}
-              onPress={handleCompleteRedemption}
-            >
+            <TouchableOpacity style={styles.confirmRedeemBtn} onPress={handleCompleteRedemption}>
               <Text style={styles.confirmRedeemText}>Benefício Aplicado no Caixa ✓</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL 2: COROA ROUBADA */}
+      {/* MODAL 2: COROA */}
       <Modal visible={!!crownVictoryData} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.victoryCard}>
             <Text style={styles.victoryIcon}>👑</Text>
             <Text style={styles.victoryTitle}>NOVO REI COROADO!</Text>
             <Text style={styles.victoryDesc}>
-              Parabéns, <Text style={{ fontWeight: 'bold' }}>Henrique</Text>! Você atingiu{' '}
+              Parabéns, <Text style={{ fontWeight: 'bold' }}>{userProfile.name}</Text>! Você atingiu{' '}
               <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.newVisits} visitas</Text>, superou{' '}
               <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.oldKing}</Text> e assumiu o reinado do{' '}
               <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.cafeName}</Text>!
@@ -1103,7 +1338,7 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* MODAL 3: MEDALHA DO CIRCUITO CONCLUÍDO */}
+      {/* MODAL 3: MEDALHA */}
       <Modal visible={Boolean(unlockedMedal)} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.medalCard}>
@@ -1111,7 +1346,7 @@ export default function App() {
             <Text style={styles.medalTitle}>DESAFIO CONCLUÍDO!</Text>
             <Text style={styles.medalSubtitle}>{unlockedMedal}</Text>
             <Text style={styles.medalDesc}>
-              Incrível, Henrique! Você percorreu todas as paradas do circuito, acumulou os quilômetros no seu perfil e faturou esta medalha exclusiva!
+              Incrível, {userProfile.name}! Você percorreu todas as paradas do circuito, acumulou os quilômetros no seu perfil e faturou esta medalha exclusiva!
             </Text>
             <TouchableOpacity style={styles.medalBtn} onPress={() => setUnlockedMedal(null)}>
               <Text style={styles.medalBtnText}>Colecionar Medalha 🌟</Text>
@@ -1120,12 +1355,9 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* MODAL 4: FORMULÁRIO DE CADASTRAR CAFETERIA */}
+      {/* MODAL 4: FORMULÁRIO DE INDICAÇÃO */}
       <Modal visible={showAddCafeModal} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.formCard}>
             <View style={styles.formHeader}>
               <Text style={styles.formTitle}>☕ Indicar Nova Cafeteria</Text>
@@ -1136,73 +1368,33 @@ export default function App() {
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
               <Text style={styles.formLabel}>Nome da Cafeteria *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Ex: Kazu Café"
-                placeholderTextColor="#999"
-                value={formName}
-                onChangeText={setFormName}
-              />
+              <TextInput style={styles.formInput} placeholder="Ex: Kazu Café" placeholderTextColor="#999" value={formName} onChangeText={setFormName} />
 
               <Text style={styles.formLabel}>Endereço ou Bairro *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Ex: R. Dr. Emílio Ribas - Cambuí"
-                placeholderTextColor="#999"
-                value={formAddress}
-                onChangeText={setFormAddress}
-              />
+              <TextInput style={styles.formInput} placeholder="Ex: R. Dr. Emílio Ribas - Cambuí" placeholderTextColor="#999" value={formAddress} onChangeText={setFormAddress} />
 
               <Text style={styles.formLabel}>Instagram da Cafeteria</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Ex: @kazucafe"
-                placeholderTextColor="#999"
-                value={formInstagram}
-                onChangeText={setFormInstagram}
-              />
+              <TextInput style={styles.formInput} placeholder="Ex: @kazucafe" placeholderTextColor="#999" value={formInstagram} onChangeText={setFormInstagram} />
 
               <Text style={styles.formLabel}>Mimo ou Sugestão de Parceria</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="Ex: 10% off ou água gelada para corredores"
-                placeholderTextColor="#999"
-                value={formPerk}
-                onChangeText={setFormPerk}
-              />
+              <TextInput style={styles.formInput} placeholder="Ex: 10% off ou água gelada para corredores" placeholderTextColor="#999" value={formPerk} onChangeText={setFormPerk} />
 
-              <TouchableOpacity 
-                style={styles.useGpsBtn}
-                onPress={handleUseCurrentLocationForCafe}
-              >
+              <TouchableOpacity style={styles.useGpsBtn} onPress={handleUseCurrentLocationForCafe}>
                 <Text style={styles.useGpsBtnText}>📍 Estou no local (Preencher meu GPS)</Text>
               </TouchableOpacity>
 
               <View style={styles.coordsRow}>
                 <View style={{ flex: 1, marginRight: 6 }}>
                   <Text style={styles.formSmallLabel}>Latitude:</Text>
-                  <TextInput
-                    style={styles.formInputSmall}
-                    value={formLat}
-                    onChangeText={setFormLat}
-                    keyboardType="numeric"
-                  />
+                  <TextInput style={styles.formInputSmall} value={formLat} onChangeText={setFormLat} keyboardType="numeric" />
                 </View>
                 <View style={{ flex: 1, marginLeft: 6 }}>
                   <Text style={styles.formSmallLabel}>Longitude:</Text>
-                  <TextInput
-                    style={styles.formInputSmall}
-                    value={formLng}
-                    onChangeText={setFormLng}
-                    keyboardType="numeric"
-                  />
+                  <TextInput style={styles.formInputSmall} value={formLng} onChangeText={setFormLng} keyboardType="numeric" />
                 </View>
               </View>
 
-              <TouchableOpacity 
-                style={styles.submitFormBtn}
-                onPress={handleSaveNewCafe}
-              >
+              <TouchableOpacity style={styles.submitFormBtn} onPress={handleSaveNewCafe}>
                 <Text style={styles.submitFormBtnText}>Salvar Indicação no Mapa ✓</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1218,6 +1410,203 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#2b1b17',
+  },
+  onboardingContainer: {
+    flex: 1,
+    backgroundColor: '#2b1b17',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 45,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
+    justifyContent: 'space-between',
+  },
+  onboardingTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  onboardingBrand: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#d4a373',
+    letterSpacing: 1,
+  },
+  onboardingSkipText: {
+    color: '#a89f91',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  onboardingSlideContent: {
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  onboardingIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(212, 163, 115, 0.15)',
+    borderWidth: 2,
+    borderColor: '#d4a373',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 35,
+    shadowColor: '#d4a373',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 15,
+  },
+  onboardingBigIcon: {
+    fontSize: 50,
+  },
+  onboardingSlideTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 16,
+    letterSpacing: 0.5,
+  },
+  onboardingSlideSubtitle: {
+    fontSize: 15,
+    color: '#d4a373',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 15,
+  },
+  onboardingSignupContent: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  signupBadge: {
+    backgroundColor: 'rgba(212, 163, 115, 0.2)',
+    color: '#d4a373',
+    fontSize: 11,
+    fontWeight: 'bold',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+    letterSpacing: 1,
+  },
+  signupTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  signupSubtitle: {
+    fontSize: 13,
+    color: '#adb5bd',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  photoPickerContainer: {
+    marginBottom: 18,
+  },
+  photoPlaceholder: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(212, 163, 115, 0.15)',
+    borderWidth: 2,
+    borderColor: '#d4a373',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoPlaceholderIcon: {
+    fontSize: 26,
+  },
+  photoPlaceholderText: {
+    fontSize: 10,
+    color: '#d4a373',
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  avatarUploadedImg: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 2,
+    borderColor: '#ffd700',
+  },
+  signupInput: {
+    width: '100%',
+    backgroundColor: '#3d2721',
+    borderWidth: 1.5,
+    borderColor: '#d4a373',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  avatarPickerLabel: {
+    fontSize: 12,
+    color: '#d4a373',
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  avatarChoiceBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3d2721',
+    borderWidth: 1.5,
+    borderColor: 'rgba(212, 163, 115, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarChoiceSelected: {
+    borderColor: '#ffd700',
+    backgroundColor: 'rgba(255, 215, 0, 0.25)',
+    transform: [{ scale: 1.15 }],
+  },
+  avatarChoiceText: {
+    fontSize: 22,
+  },
+  onboardingFooter: {
+    width: '100%',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+  },
+  dotPill: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  dotPillActive: {
+    width: 24,
+    backgroundColor: '#d4a373',
+  },
+  onboardingNextBtn: {
+    backgroundColor: '#d4a373',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#d4a373',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  onboardingNextBtnText: {
+    color: '#2b1b17',
+    fontSize: 16,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   header: {
     paddingHorizontal: 18,
@@ -1289,7 +1678,6 @@ const styles = StyleSheet.create({
   gpsButtonText: {
     fontSize: 22,
   },
-  // BARRA DE ABAS INFERIOR (TABS)
   bottomTabBar: {
     flexDirection: 'row',
     backgroundColor: '#2b1b17',
@@ -1316,7 +1704,6 @@ const styles = StyleSheet.create({
     color: '#d4a373',
     fontWeight: 'bold',
   },
-  // TELAS DAS ABAS (SCROLL)
   tabScreenScroll: {
     flex: 1,
     padding: 18,
@@ -1334,7 +1721,249 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 16,
   },
-  // CARDS DE CIRCUITO
+  // ESTILOS DA ABA COMUNIDADE
+  communitySectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  kingsCarousel: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  kingCarouselCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    marginRight: 10,
+    width: 105,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+    position: 'relative',
+  },
+  kingCrownBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 8,
+  },
+  kingAvatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fdf7f2',
+    borderWidth: 1.5,
+    borderColor: '#d4a373',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  kingCardName: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+    textAlign: 'center',
+  },
+  kingCardCafe: {
+    fontSize: 10,
+    color: '#7f4f24',
+    fontWeight: '600',
+    marginTop: 1,
+    textAlign: 'center',
+  },
+  kingCardVisits: {
+    fontSize: 10,
+    color: '#adb5bd',
+    marginTop: 2,
+  },
+  // Card de Evento
+  eventCard: {
+    backgroundColor: '#2b1b17',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: 1.5,
+    borderColor: '#d4a373',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  eventHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  eventTag: {
+    backgroundColor: '#d4a373',
+    color: '#2b1b17',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    letterSpacing: 0.5,
+  },
+  eventDate: {
+    color: '#d4a373',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  eventTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 6,
+  },
+  eventDesc: {
+    fontSize: 12,
+    color: '#d4a373',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  eventAttendBtn: {
+    backgroundColor: '#d4a373',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  eventAttendingActive: {
+    backgroundColor: '#28a745',
+  },
+  eventAttendBtnText: {
+    color: '#2b1b17',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  eventAttendingActiveText: {
+    color: '#fff',
+  },
+  // Feed Cards
+  feedCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  feedCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  feedAvatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+  },
+  feedAuthorName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+  },
+  feedActionText: {
+    fontSize: 12,
+    color: '#7f4f24',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  feedTimeAgo: {
+    fontSize: 11,
+    color: '#adb5bd',
+  },
+  feedStatsBox: {
+    backgroundColor: '#fdf7f2',
+    padding: 8,
+    borderRadius: 8,
+    marginVertical: 8,
+  },
+  feedStatsText: {
+    fontSize: 12,
+    color: '#7f4f24',
+    fontWeight: 'bold',
+  },
+  feedCommentText: {
+    fontSize: 13,
+    color: '#495057',
+    fontStyle: 'italic',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  feedBadgePill: {
+    backgroundColor: '#e8f5e9',
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  feedBadgeText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: 'bold',
+  },
+  feedFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+    paddingTop: 10,
+    marginTop: 4,
+  },
+  cheersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  cheersButtonActive: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeeba',
+  },
+  cheersIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  cheersText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#495057',
+  },
+  cheersTextActive: {
+    color: '#856404',
+  },
+  feedCityTag: {
+    fontSize: 11,
+    color: '#adb5bd',
+  },
+  // CIRCUITOS
   circuitCard: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -1412,7 +2041,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  // TELA DE PERFIL
+  // PERFIL
   profileHeaderCard: {
     backgroundColor: '#fff',
     borderRadius: 20,
@@ -1426,20 +2055,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   avatarCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: '#2b1b17',
     borderWidth: 3,
     borderColor: '#d4a373',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
+    position: 'relative',
+  },
+  avatarProfileImg: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  editPhotoBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#fff',
+    padding: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d4a373',
   },
   avatarText: {
-    color: '#fff',
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 32,
   },
   profileBigName: {
     fontSize: 20,
@@ -1532,6 +2175,20 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     fontStyle: 'italic',
   },
+  seeOnboardingBtn: {
+    backgroundColor: '#fdf7f2',
+    borderWidth: 1.5,
+    borderColor: '#d4a373',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  seeOnboardingBtnText: {
+    color: '#7f4f24',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
   resetBtn: {
     paddingVertical: 14,
     alignItems: 'center',
@@ -1542,7 +2199,6 @@ const styles = StyleSheet.create({
     color: '#adb5bd',
     textDecorationLine: 'underline',
   },
-  // PAINEIS FLUTUANTES NO MAPA
   circuitSheet: {
     position: 'absolute',
     bottom: 25,
@@ -1859,7 +2515,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  // MODAIS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
