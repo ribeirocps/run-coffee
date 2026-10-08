@@ -1,1276 +1,842 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// PALETA OFICIAL RUNCOFFEE
-const THEME = {
-  espresso: '#1C1412',      // Marrom café profundo
-  espressoLight: '#2C201C', // Cartões e cabeçalhos
-  terracotta: '#C85A32',    // Laranja esportivo / corrida
-  amber: '#DDA15E',         // Dourado para coroas e badges
-  oatCream: '#F8F5F0',      // Fundo das telas claras
-  cardBg: '#FFFFFF',        // Cartões
-  textDark: '#1C1412',      // Texto principal
-  textMuted: '#7A6E65',     // Texto secundário
-  borderLight: '#EBE5DC',   // Bordas suaves
-  successGreen: '#2D6A4F',  // Check-ins
-};
+const { width } = Dimensions.get('window');
 
-const STORAGE_CAFES_KEY = '@runcoffee_cafes';
-const STORAGE_PROFILE_KEY = '@runcoffee_profile';
-const STORAGE_ONBOARDING_KEY = '@runcoffee_onboarding_done';
+// Chave do AsyncStorage para postagens da comunidade
+const STORAGE_POSTS_KEY = '@runcoffee_community_posts';
 
-// 10 CAFETERIAS ESPECIAIS REAIS DE CAMPINAS
+// 10 Cafeterias Especiais Reais de Campinas/SP
 const INITIAL_CAFES = [
   {
     id: '1',
     name: 'D.Origem Cafés Especiais',
-    shortName: 'D.Origem',
-    address: 'R. Antônio Cesarino, 324 - Centro',
-    lat: -22.9068,
-    lng: -47.0516,
-    kingName: 'Lucas',
-    kingVisits: 10,
-    myVisits: 9,
-    perk: '10% off em cafés filtrados',
-    instagram: '@dorigemcafe',
+    lat: -22.9038,
+    lng: -47.0583,
+    address: 'R. Regente Feijó, 1070 - Centro',
+    neighborhood: 'Centro',
+    currentKing: 'Rafa Runner',
+    kingVisits: 14,
+    perk: 'Espresso Cortesia ou 15% OFF no grão',
+    distanceKm: 0.8,
+    isPartner: true,
   },
   {
     id: '2',
-    name: 'Wood Especiais - Centro',
-    shortName: 'Wood Centro',
-    address: 'R. Dr. Quirino, 1156 - Centro',
-    lat: -22.9028,
-    lng: -47.0552,
-    kingName: 'Henrique',
-    kingVisits: 8,
-    myVisits: 8,
-    perk: 'Espresso cortesia no 5º check-in',
-    instagram: '@woodespeciais',
+    name: 'Wood Cafés Especiais I',
+    lat: -22.9056,
+    lng: -47.0605,
+    address: 'R. Dr. Quirino, 1185 - Centro',
+    neighborhood: 'Centro',
+    currentKing: 'Bia Marathon',
+    kingVisits: 11,
+    perk: '10% de desconto no Cold Brew gelado',
+    distanceKm: 1.1,
+    isPartner: true,
   },
   {
     id: '3',
-    name: 'Divino Verde Botânica',
-    shortName: 'Divino Verde',
-    address: 'Av. Dr. Moraes Salles, 1288 - Bosque',
-    lat: -22.9088,
-    lng: -47.0519,
-    kingName: 'Sem Rei',
-    kingVisits: 0,
-    myVisits: 0,
-    perk: '15% off no combo café + fatia',
-    instagram: '@divinoverdecafe',
+    name: 'Wood Cafés Especiais II',
+    lat: -22.8987,
+    lng: -47.0468,
+    address: 'Av. Cel. Silva Telles, 715 - Nova Campinas',
+    neighborhood: 'Cambuí',
+    currentKing: 'Leo Pace 4:30',
+    kingVisits: 8,
+    perk: 'Double espresso após o treino',
+    distanceKm: 1.6,
+    isPartner: true,
   },
   {
     id: '4',
-    name: 'Café Container',
-    shortName: 'Container',
-    address: 'R. Antônio Lapa, 1080 - Cambuí',
-    lat: -22.8953,
-    lng: -47.0494,
-    kingName: 'Mariana',
-    kingVisits: 14,
-    myVisits: 4,
-    perk: 'Upgrade de tamanho grátis',
-    instagram: '@cafecontainer',
+    name: 'Divino Verde Botânica & Café',
+    lat: -22.9125,
+    lng: -47.0531,
+    address: 'R. Aquidaban, 440 - Bosque',
+    neighborhood: 'Bosque',
+    currentKing: 'Mariana Trail',
+    kingVisits: 9,
+    perk: '15% de desconto no Pão de Queijo artesanal',
+    distanceKm: 1.9,
+    isPartner: true,
   },
   {
     id: '5',
-    name: 'Abigail Coffee Co.',
-    shortName: 'Abigail',
-    address: 'R. Dr. Guilherme da Silva, 300 - Cambuí',
-    lat: -22.8981,
-    lng: -47.0489,
-    kingName: 'Pedro',
-    kingVisits: 12,
-    myVisits: 2,
-    perk: '10% off para corredores',
-    instagram: '@abigailcoffeeco',
+    name: 'Café Container',
+    lat: -22.8942,
+    lng: -47.0515,
+    address: 'R. Cel. Quirino, 1072 - Cambuí',
+    neighborhood: 'Cambuí',
+    currentKing: 'Carlos Iron',
+    kingVisits: 16,
+    perk: 'Espresso duplo com borda de doce de leite',
+    distanceKm: 2.2,
+    isPartner: true,
   },
   {
     id: '6',
-    name: 'Cafeteria Cambuí',
-    shortName: 'Café Cambuí',
-    address: 'R. Dr. Vieira Bueno, 154 - Cambuí',
-    lat: -22.9004,
-    lng: -47.0526,
-    kingName: 'Sem Rei',
-    kingVisits: 0,
-    myVisits: 1,
-    perk: '10% off no espresso duplo',
-    instagram: '@cafeteriacambui',
+    name: 'Abigail Coffee Co.',
+    lat: -22.8967,
+    lng: -47.0492,
+    address: 'R. Maria Monteiro, 1426 - Cambuí',
+    neighborhood: 'Cambuí',
+    currentKing: 'Camila Sprint',
+    kingVisits: 13,
+    perk: 'Free shot de Vanilla Cold Brew',
+    distanceKm: 2.4,
+    isPartner: true,
   },
   {
     id: '7',
-    name: 'Como Assim?! Café',
-    shortName: 'Como Assim?!',
-    address: 'R. Maria Monteiro, 1269 - Cambuí',
-    lat: -22.8948,
-    lng: -47.0478,
-    kingName: 'Carla',
-    kingVisits: 6,
-    myVisits: 0,
-    perk: 'Bolo artesanal com café coado por R$ 18',
-    instagram: '@comoassimcafe',
+    name: 'Cafeteria Cambuí',
+    lat: -22.8995,
+    lng: -47.0541,
+    address: 'R. Dr. Emílio Ribas, 485 - Cambuí',
+    neighborhood: 'Cambuí',
+    currentKing: 'Pedro 10k',
+    kingVisits: 7,
+    perk: '10% OFF em qualquer método filtrado V60',
+    distanceKm: 2.1,
+    isPartner: true,
   },
   {
     id: '8',
-    name: 'Amo Café',
-    shortName: 'Amo Café',
-    address: 'R. Dr. Emílio Ribas, 487 - Cambuí',
-    lat: -22.8969,
-    lng: -47.0521,
-    kingName: 'Sem Rei',
-    kingVisits: 0,
-    myVisits: 0,
-    perk: 'Água gelada cortesia + 10% no pedido',
-    instagram: '@amocafe',
+    name: 'Como Assim?! Café',
+    lat: -22.8931,
+    lng: -47.0502,
+    address: 'R. Américo Brasiliense, 320 - Cambuí',
+    neighborhood: 'Cambuí',
+    currentKing: 'Julia Café',
+    kingVisits: 10,
+    perk: 'Upgrade grátis de tamanho no Latte',
+    distanceKm: 2.5,
+    isPartner: true,
   },
   {
     id: '9',
-    name: 'Wood Especiais - Nova Campinas',
-    shortName: 'Wood Nova Camp.',
-    address: 'Av. Dr. Hermas Braga, 343 - Nova Campinas',
-    lat: -22.8986,
-    lng: -47.0392,
-    kingName: 'Rafael',
-    kingVisits: 11,
-    myVisits: 0,
-    perk: 'Waffle de pão de queijo com 15% off',
-    instagram: '@woodespeciais',
+    name: 'Amo Café',
+    lat: -22.8918,
+    lng: -47.0528,
+    address: 'R. Júlio de Mesquita, 725 - Cambuí',
+    neighborhood: 'Cambuí',
+    currentKing: 'Fernanda Run',
+    kingVisits: 6,
+    perk: '15% de desconto no combo Café + Cookie',
+    distanceKm: 2.6,
+    isPartner: true,
   },
   {
     id: '10',
     name: '1727 Coffee Roasters',
-    shortName: '1727 Roasters',
-    address: 'R. José Martins, 603 - Barão Geraldo',
-    lat: -22.8252,
-    lng: -47.0854,
-    kingName: 'Thiago',
-    kingVisits: 15,
-    myVisits: 0,
-    perk: 'Degustação de grão do dia na compra de café',
-    instagram: '@1727coffee',
+    lat: -22.8285,
+    lng: -47.0862,
+    address: 'R. Maria Tereza Dias da Silva, 664 - Barão Geraldo',
+    neighborhood: 'Barão Geraldo',
+    currentKing: 'Lucas Unicamp',
+    kingVisits: 12,
+    perk: 'Degustação guiada de microlote especial',
+    distanceKm: 9.8,
+    isPartner: true,
   },
 ];
 
-const CIRCUITS = [
+// Coordenadas Centrais por Bairro para a Câmera
+const NEIGHBORHOOD_CENTERS: Record<string, { lat: number; lng: number; zoom: number }> = {
+  Todos: { lat: -22.9020, lng: -47.0540, zoom: 14 },
+  Cambuí: { lat: -22.8950, lng: -47.0510, zoom: 15 },
+  Centro: { lat: -22.9045, lng: -47.0595, zoom: 16 },
+  Bosque: { lat: -22.9125, lng: -47.0531, zoom: 16 },
+  'Barão Geraldo': { lat: -22.8285, lng: -47.0862, zoom: 15 },
+};
+
+// Circuitos Oficiais
+const INITIAL_CIRCUITS = [
   {
     id: 'c1',
-    title: 'Circuito Centro-Bosque',
+    title: 'Circuito Centro & Bosque',
     distance: '3.2 km',
-    badge: '🏅 Medalha Centro-Bosque',
-    desc: 'Conecte o polo histórico do Centro ao charme botânico do Bosque.',
-    cafeIds: ['1', '2', '3'],
+    pace: 'Tranquilo / Urbano',
+    description: 'Comece pelo D.Origem, passe pela Wood Centro e finalize no verde do Divino Verde.',
+    cafes: ['D.Origem', 'Wood Centro', 'Divino Verde'],
+    progress: 1,
+    totalSteps: 3,
+    badgeAwarded: '🏅 Medalha Centro Histórico',
+    completed: false,
   },
   {
     id: 'c2',
     title: 'Circuito Cambuí Nobre',
     distance: '2.8 km',
-    badge: '🏅 Medalha Cambuí Nobre',
-    desc: 'O circuito mais consagrado de café especial de Campinas.',
-    cafeIds: ['4', '5', '6', '7'],
+    pace: 'Rápido / Calçadas Largas',
+    description: 'Exploração pelos cafés mais concorridos do Cambuí: Container, Abigail e Como Assim?!',
+    cafes: ['Café Container', 'Abigail Coffee', 'Como Assim?!'],
+    progress: 0,
+    totalSteps: 3,
+    badgeAwarded: '👑 Coroa do Cambuí',
+    completed: false,
   },
 ];
 
-const INITIAL_PROFILE = {
-  name: 'Henrique',
-  avatar: '🏃‍♂️',
-  photoUri: null as string | null,
-  totalKm: 14.2,
-  crownsCount: 1,
-  medals: ['🏅 Pioneiro RunCoffee'],
-};
-
+// Postagens Iniciais
 const INITIAL_POSTS = [
   {
     id: 'p1',
-    authorName: 'Henrique Ribeiro',
-    authorAvatar: '🏃‍♂️',
-    timeAgo: 'Há 18 min',
-    action: 'Completou o Circuito Centro-Bosque',
-    stats: '📍 3.2 km • ⏱️ 21 min • ⚡ 6\'33"/km',
-    comment: 'Treino matinal fechado com chave de ouro e espresso no balcão! ☕🔥',
-    badge: '🏅 Medalha Centro-Bosque',
-    cheersCount: 14,
-    userHasCheered: false,
+    userName: 'Rafa Runner',
+    avatar: '🏃‍♂️',
+    timeAgo: 'Há 25 min',
+    cafeName: 'D.Origem Cafés Especiais',
+    text: 'Treino de 7km pelo Centro finalizado com um filtrado Bourbon Amarelo sensacional! Bati o recorde do Reinado.',
+    photo: null,
+    cheers: 8,
+    hasCheered: false,
   },
   {
     id: 'p2',
-    authorName: 'Mariana Silva',
-    authorAvatar: '🏃‍♀️',
-    timeAgo: 'Há 45 min',
-    action: 'Assumiu o Trono do Café Container! 👑',
-    stats: '📍 2.8 km • ☕ Check-in de Corrida (+2 visitas)',
-    comment: 'Passei o Pedro e agora sou a nova Rainha do Cambuí! Quem vai encarar?',
-    badge: null,
-    cheersCount: 22,
-    userHasCheered: false,
+    userName: 'Bia Marathon',
+    avatar: '🏃‍♀️',
+    timeAgo: 'Há 2 horas',
+    cafeName: 'Café Container',
+    text: 'Longão de sábado fechando no Container. O Cold Brew deles geladinho salva qualquer perna cansada! ☕🧊',
+    photo: null,
+    cheers: 14,
+    hasCheered: true,
   },
   {
     id: 'p3',
-    authorName: 'Lucas Mendes',
-    authorAvatar: '⚡',
-    timeAgo: 'Há 2 horas',
-    action: 'Defendeu o Reinado na D.Origem',
-    stats: '📍 4.5 km a pé pelo Centro',
-    comment: 'Café filtrado na V60 depois de subir a Cesarino no trote.',
-    badge: null,
-    cheersCount: 9,
-    userHasCheered: false,
+    userName: 'Thiago Pace',
+    avatar: '⚡',
+    timeAgo: 'Há 5 horas',
+    cafeName: 'Abigail Coffee Co.',
+    text: 'Circuito Cambuí completado! 3 paradas, 3 espressos e muito ritmo nas pernas.',
+    photo: null,
+    cheers: 11,
+    hasCheered: false,
   },
 ];
 
-const ONBOARDING_SLIDES = [
-  {
-    id: '1',
-    icon: '☕🗺️',
-    title: 'Descubra Cafés Especiais',
-    subtitle: 'As melhores cafeterias artesanais de Campinas mapeadas em um circuito urbano feito para quem valoriza café de verdade.',
-  },
-  {
-    id: '2',
-    icon: '🏃‍♂️⚡',
-    title: 'Corra ou Caminhe até Eles',
-    subtitle: 'Trace trajetos a pé com GPS em tempo real. O velocímetro anti-fraude garante que apenas quem foi a pé ganhe o bônus esportivo (+2 visitas)!',
-  },
-  {
-    id: '3',
-    icon: '👑🎁',
-    title: 'Conquiste o Trono & Benefícios',
-    subtitle: 'Frequente com constância para destronar o Rei da cafeteria, colecionar medalhas e resgatar descontos exclusivos no balcão.',
-  },
-];
+export default function RunCoffeeApp() {
+  const [activeTab, setActiveTab] = useState<'mapa' | 'circuitos' | 'comunidade' | 'perfil'>('mapa');
 
-export default function App() {
-  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
-  const [onboardingStep, setOnboardingStep] = useState(0);
-  const [signupName, setSignupName] = useState('Henrique');
-  const [signupAvatar, setSignupAvatar] = useState('🏃‍♂️');
-  const [signupPhotoUri, setSignupPhotoUri] = useState<string | null>(null);
+  // Perfil
+  const [userName, setUserName] = useState('Corredor Urbano');
+  const [userAvatar, setUserAvatar] = useState('🏃');
+  const [userVisits, setUserVisits] = useState(4);
+  const [userKm, setUserKm] = useState(24.5);
+  const [userCrowns, setUserCrowns] = useState(1);
+  const [userMedals, setUserMedals] = useState<string[]>(['🏅 Primeiro 5k']);
 
-  const [activeTab, setActiveTab] = useState<'map' | 'circuits' | 'community' | 'profile'>('map');
-
+  // Cafés e Filtro por Bairro
   const [cafes, setCafes] = useState(INITIAL_CAFES);
-  const [userProfile, setUserProfile] = useState(INITIAL_PROFILE);
-  const [selectedCafe, setSelectedCafe] = useState<any>(null);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-
-  const [posts, setPosts] = useState(INITIAL_POSTS);
-  const [isEventAttending, setIsEventAttending] = useState(false);
-  const [eventAttendeesCount, setEventAttendeesCount] = useState(24);
-
-  const [activeRoute, setActiveRoute] = useState<{
-    cafe: any;
-    distance: string;
-    duration: string;
-  } | null>(null);
-
-  const [activeCircuit, setActiveCircuit] = useState<any>(null);
-  const [circuitCompletedCafeIds, setCircuitCompletedCafeIds] = useState<string[]>([]);
-  const [unlockedMedal, setUnlockedMedal] = useState<string | null>(null);
-
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState('Todos');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedCafe, setSelectedCafe] = useState<any | null>(null);
+  const [activeRoute, setActiveRoute] = useState<{ cafe: any; distanceKm: number; durationMin: number } | null>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const targetCafeRef = useRef<any>(null);
 
-  const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number>(0);
-  const [isVehicleDetected, setIsVehicleDetected] = useState(false);
+  // Modais de Gamificação
+  const [isTakeoverModalVisible, setIsTakeoverModalVisible] = useState(false);
+  const [newReinadoInfo, setNewReinadoInfo] = useState<{ cafeName: string; visits: number } | null>(null);
+  const [isPerkModalVisible, setIsPerkModalVisible] = useState(false);
+  const [perkTimer, setPerkTimer] = useState(90);
 
-  const [isArrived, setIsArrived] = useState(false);
-  const [showCouponModal, setShowCouponModal] = useState(false);
-  const [countdown, setCountdown] = useState(90);
-  const [redeemingCafe, setRedeemingCafe] = useState<any>(null);
-  const [redeemPointsToAdd, setRedeemPointsToAdd] = useState<number>(1);
+  // Modal de Indicação
+  const [isNominateModalVisible, setIsNominateModalVisible] = useState(false);
+  const [nominateName, setNominateName] = useState('');
+  const [nominateAddress, setNominateAddress] = useState('');
+  const [nominateInstagram, setNominateInstagram] = useState('');
+  const [nominatePerk, setNominatePerk] = useState('');
 
-  const [crownVictoryData, setCrownVictoryData] = useState<{
-    cafeName: string;
-    oldKing: string;
-    newVisits: number;
-  } | null>(null);
+  // Circuitos e Comunidade
+  const [circuits, setCircuits] = useState(INITIAL_CIRCUITS);
+  const [communityPosts, setCommunityPosts] = useState(INITIAL_POSTS);
+  const [isRunClubJoined, setIsRunClubJoined] = useState(false);
 
-  const [showAddCafeModal, setShowAddCafeModal] = useState(false);
-  const [formName, setFormName] = useState('');
-  const [formAddress, setFormAddress] = useState('');
-  const [formInstagram, setFormInstagram] = useState('');
-  const [formPerk, setFormPerk] = useState('');
-  const [formLat, setFormLat] = useState('-22.8990');
-  const [formLng, setFormLng] = useState('-47.0510');
+  // Postar no Feed
+  const [isPostModalVisible, setIsPostModalVisible] = useState(false);
+  const [postText, setPostText] = useState('');
+  const [postCafe, setPostCafe] = useState('');
+  const [postPhoto, setPostPhoto] = useState<string | null>(null);
 
   const webViewRef = useRef<WebView>(null);
 
-  // Carrega e mescla com as cafeterias reais
+  // 1. Carregar Postagens do AsyncStorage na Inicialização
   useEffect(() => {
-    const loadStoredData = async () => {
+    (async () => {
       try {
-        const hasDoneOnboarding = await AsyncStorage.getItem(STORAGE_ONBOARDING_KEY);
-        setOnboardingDone(hasDoneOnboarding === 'true');
-
-        const savedCafes = await AsyncStorage.getItem(STORAGE_CAFES_KEY);
-        const savedProfile = await AsyncStorage.getItem(STORAGE_PROFILE_KEY);
-
-        if (savedCafes) {
-          const parsed = JSON.parse(savedCafes);
-          // Garante que as 10 cafeterias reais sempre apareçam
-          const merged = INITIAL_CAFES.map((init) => {
-            const found = parsed.find((p: any) => p.id === init.id);
-            return found ? { ...init, ...found } : init;
-          });
-          const userAdded = parsed.filter((p: any) => !INITIAL_CAFES.some((i) => i.id === p.id));
-          setCafes([...merged, ...userAdded]);
-        } else {
-          setCafes(INITIAL_CAFES);
-        }
-
-        if (savedProfile) {
-          const parsed = JSON.parse(savedProfile);
-          setUserProfile({
-            ...parsed,
-            medals: Array.isArray(parsed.medals) ? parsed.medals : ['🏅 Pioneiro RunCoffee'],
-          });
-          if (parsed.name) setSignupName(parsed.name);
-          if (parsed.avatar) setSignupAvatar(parsed.avatar);
-          if (parsed.photoUri) setSignupPhotoUri(parsed.photoUri);
+        const stored = await AsyncStorage.getItem(STORAGE_POSTS_KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCommunityPosts(parsed);
+          }
         }
       } catch (e) {
-        console.error('Erro ao carregar dados:', e);
+        console.log('Erro ao carregar posts do storage:', e);
       }
-    };
-    loadStoredData();
+    })();
   }, []);
 
-  const persistData = async (newCafes: any[], newProfile: any) => {
+  // 2. Salvar Postagens no AsyncStorage
+  const savePostsToStorage = async (newPostsList: typeof communityPosts) => {
     try {
-      await AsyncStorage.setItem(STORAGE_CAFES_KEY, JSON.stringify(newCafes));
-      await AsyncStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(newProfile));
+      await AsyncStorage.setItem(STORAGE_POSTS_KEY, JSON.stringify(newPostsList));
     } catch (e) {
-      console.error('Erro ao salvar dados:', e);
+      console.log('Erro ao salvar posts no storage:', e);
     }
   };
 
-  const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permissão Necessária', 'Permita o acesso à galeria para escolher sua foto.');
+  // 3. Localização do Usuário
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({});
+          setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        } else {
+          setUserLocation({ lat: -22.9020, lng: -47.0540 });
+        }
+      } catch {
+        setUserLocation({ lat: -22.9020, lng: -47.0540 });
+      }
+    })();
+  }, []);
+
+  // 4. Timer do Cupom de Benefício (90 segundos)
+  useEffect(() => {
+    let interval: any = null;
+    if (isPerkModalVisible && perkTimer > 0) {
+      interval = setInterval(() => setPerkTimer((prev) => prev - 1), 1000);
+    } else if (perkTimer === 0) {
+      setIsPerkModalVisible(false);
+      Alert.alert('Tempo esgotado', 'O cupom de 90 segundos expirou!');
+    }
+    return () => clearInterval(interval);
+  }, [isPerkModalVisible, perkTimer]);
+
+  // Filtragem de Cafeterias
+  const filteredCafes =
+    selectedNeighborhood === 'Todos'
+      ? cafes
+      : cafes.filter(
+          (c) =>
+            (c.neighborhood && c.neighborhood.toLowerCase() === selectedNeighborhood.toLowerCase()) ||
+            c.address.toLowerCase().includes(selectedNeighborhood.toLowerCase())
+        );
+
+  // Mudar de Bairro e Reposicionar Mapa
+  const handleSelectNeighborhood = (bairro: string) => {
+    setSelectedNeighborhood(bairro);
+    setSelectedCafe(null);
+    const target = NEIGHBORHOOD_CENTERS[bairro] || NEIGHBORHOOD_CENTERS.Todos;
+    webViewRef.current?.injectJavaScript(`
+      if (window.centerMapWithZoom) {
+        window.centerMapWithZoom(${target.lat}, ${target.lng}, ${target.zoom});
+      }
+      true;
+    `);
+  };
+
+  // Selecionar Foto
+  const handlePickPostPhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPostPhoto(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.log('Erro ao selecionar foto:', e);
+    }
+  };
+
+  // Criar Post e Persistir
+  const handleCreatePost = () => {
+    if (!postText.trim()) {
+      Alert.alert('Atenção', 'Escreva uma mensagem sobre seu treino ou café!');
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      setSignupPhotoUri(uri);
-      const updated = { ...userProfile, photoUri: uri };
-      setUserProfile(updated);
-      persistData(cafes, updated);
-    }
-  };
-
-  const handleFinishOnboarding = async () => {
-    const updatedProfile = {
-      ...userProfile,
-      name: signupName.trim() || 'Corredor',
-      avatar: signupAvatar,
-      photoUri: signupPhotoUri,
+    const newPost = {
+      id: String(Date.now()),
+      userName: userName || 'Corredor Urbano',
+      avatar: userAvatar || '☕',
+      timeAgo: 'Agora mesmo',
+      cafeName: postCafe.trim() || 'Treino Livre',
+      text: postText.trim(),
+      photo: postPhoto,
+      cheers: 0,
+      hasCheered: false,
     };
-    setUserProfile(updatedProfile);
-    await AsyncStorage.setItem(STORAGE_ONBOARDING_KEY, 'true');
-    await AsyncStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(updatedProfile));
-    setOnboardingDone(true);
+    const updated = [newPost, ...communityPosts];
+    setCommunityPosts(updated);
+    savePostsToStorage(updated);
+
+    setPostText('');
+    setPostCafe('');
+    setPostPhoto(null);
+    setIsPostModalVisible(false);
+    Alert.alert('Publicado! 🎉', 'Seu relato está salvo e visível no feed da comunidade!');
   };
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (showCouponModal && countdown > 0) {
-      timer = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [showCouponModal, countdown]);
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // MAPA COM ESTILO MODERNO CARTODB VOYAGER E PINS DE ALTA DEFINIÇÃO
-  const mapHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>
-        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #F8F5F0; }
-
-        /* PINO MODERNO: PÍLULA FLUTUANTE ESTILO AIRBNB / GOOGLE MAPS */
-        .modern-pin-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          filter: drop-shadow(0 4px 8px rgba(28, 20, 18, 0.28));
-          cursor: pointer;
-        }
-
-        .modern-pin-badge {
-          background: #FFFFFF;
-          border: 2px solid #C85A32;
-          border-radius: 20px;
-          padding: 4px 10px;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          white-space: nowrap;
-        }
-
-        .has-king-badge {
-          border-color: #DDA15E;
-          background: #FFFDF9;
-        }
-
-        .pin-text {
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-          font-size: 11px;
-          font-weight: 700;
-          color: #1C1412;
-          letter-spacing: 0.2px;
-        }
-
-        .pin-pointer {
-          width: 0;
-          height: 0;
-          border-left: 6px solid transparent;
-          border-right: 6px solid transparent;
-          border-top: 6px solid #C85A32;
-          margin-top: -1px;
-        }
-
-        .has-king-pointer {
-          border-top-color: #DDA15E;
-        }
-
-        /* RADAR GPS DA SUA CANECA */
-        .user-radar-container {
-          position: relative;
-          width: 44px;
-          height: 44px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .user-radar-pulse {
-          position: absolute;
-          width: 44px;
-          height: 44px;
-          border-radius: 22px;
-          background: rgba(200, 90, 50, 0.35);
-          animation: radarWave 2s infinite ease-out;
-        }
-
-        .user-center-cup {
-          width: 34px;
-          height: 34px;
-          border-radius: 17px;
-          background: #1C1412;
-          border: 2.5px solid #DDA15E;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.4);
-          z-index: 10;
-        }
-
-        @keyframes radarWave {
-          0% { transform: scale(0.6); opacity: 1; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        // Centralizado no coração de Campinas
-        var map = L.map('map', { zoomControl: false }).setView([-22.9015, -47.0515], 15);
-
-        // CAMADA MODERNA CARTODB VOYAGER (Clean, tons pastéis e ruas elegantes)
-       L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-  maxZoom: 20,
-  subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-  attribution: '&copy; Google Maps'
-}).addTo(map);
-
-        var cafes = ${JSON.stringify(cafes)};
-
-        cafes.forEach(function(cafe) {
-          var hasKing = cafe.kingName && cafe.kingName !== 'Sem Rei';
-          var crownIcon = hasKing ? ' 👑' : '';
-          var label = (cafe.shortName || cafe.name.split(' ')[0]) + crownIcon;
-
-          var customHtml = 
-            '<div class="modern-pin-container">' +
-              '<div class="modern-pin-badge ' + (hasKing ? 'has-king-badge' : '') + '">' +
-                '<span>☕</span>' +
-                '<span class="pin-text">' + label + '</span>' +
-              '</div>' +
-              '<div class="pin-pointer ' + (hasKing ? 'has-king-pointer' : '') + '"></div>' +
-            '</div>';
-
-          var icon = L.divIcon({
-            className: 'custom-leaflet-div',
-            html: customHtml,
-            iconSize: [100, 36],
-            iconAnchor: [50, 36]
-          });
-
-          var marker = L.marker([cafe.lat, cafe.lng], { icon: icon }).addTo(map);
-          marker.on('click', function() {
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_CAFE', cafeId: cafe.id }));
-            }
-          });
-        });
-
-        var userMarker = null;
-        var currentRouteLayer = null;
-
-        // Caneca do Usuário com efeito Radar
-        window.updateUserPosition = function(lat, lng, recenter) {
-          var userHtml = 
-            '<div class="user-radar-container">' +
-              '<div class="user-radar-pulse"></div>' +
-              '<div class="user-center-cup">☕</div>' +
-            '</div>';
-
-          var userIcon = L.divIcon({
-            className: 'custom-user-div',
-            html: userHtml,
-            iconSize: [44, 44],
-            iconAnchor: [22, 22]
-          });
-
-          if (!userMarker) {
-            userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 2000 }).addTo(map);
-          } else {
-            userMarker.setLatLng([lat, lng]);
-          }
-
-          if (recenter) {
-            map.setView([lat, lng], 16);
-          }
+  // Dar Brinde e Salvar Estado
+  const handleToggleCheer = (postId: string) => {
+    const updated = communityPosts.map((post) => {
+      if (post.id === postId) {
+        const nextCheered = !post.hasCheered;
+        return {
+          ...post,
+          hasCheered: nextCheered,
+          cheers: nextCheered ? post.cheers + 1 : post.cheers - 1,
         };
-
-        window.centerOnUser = function() {
-          if (userMarker) {
-            map.setView(userMarker.getLatLng(), 16);
-          }
-        };
-
-        // Rota de Pedestre com linha Terracota Esportiva
-        window.tracePedestrianRoute = function(startLat, startLng, endLat, endLng) {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
-
-          var url = 'https://router.project-osrm.org/route/v1/foot/' + startLng + ',' + startLat + ';' + endLng + ',' + endLat + '?overview=full&geometries=geojson';
-
-          fetch(url)
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (data.routes && data.routes.length > 0) {
-                var route = data.routes[0];
-                var coordinates = route.geometry.coordinates.map(function(c) {
-                  return [c[1], c[0]];
-                });
-
-                currentRouteLayer = L.polyline(coordinates, {
-                  color: '#C85A32',
-                  weight: 5,
-                  opacity: 0.92,
-                  dashArray: '8, 8',
-                  lineJoin: 'round'
-                }).addTo(map);
-
-                map.fitBounds(currentRouteLayer.getBounds(), { padding: [55, 55] });
-
-                var distKm = (route.distance / 1000).toFixed(1);
-                var durationMin = Math.max(1, Math.round(route.duration / 60));
-
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'ROUTE_READY',
-                    distance: distKm + ' km',
-                    duration: '~' + durationMin + ' min'
-                  }));
-                }
-              }
-            })
-            .catch(function(err) {
-              var coords = [[startLat, startLng], [endLat, endLng]];
-              currentRouteLayer = L.polyline(coords, { color: '#C85A32', weight: 4, dashArray: '5, 5' }).addTo(map);
-              map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
-            });
-        };
-
-        // Rota de Circuito com Linha Dourada Âmbar
-        window.traceCircuitRoute = function(waypoints) {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
-
-          var coordString = waypoints.map(function(w) { return w.lng + ',' + w.lat; }).join(';');
-          var url = 'https://router.project-osrm.org/route/v1/foot/' + coordString + '?overview=full&geometries=geojson';
-
-          fetch(url)
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-              if (data.routes && data.routes.length > 0) {
-                var route = data.routes[0];
-                var coordinates = route.geometry.coordinates.map(function(c) {
-                  return [c[1], c[0]];
-                });
-
-                currentRouteLayer = L.polyline(coordinates, {
-                  color: '#DDA15E',
-                  weight: 6,
-                  opacity: 0.95,
-                  lineJoin: 'round'
-                }).addTo(map);
-
-                map.fitBounds(currentRouteLayer.getBounds(), { padding: [65, 65] });
-              }
-            })
-            .catch(function(err) {
-              var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
-              currentRouteLayer = L.polyline(coords, { color: '#DDA15E', weight: 5 }).addTo(map);
-              map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
-            });
-        };
-
-        window.removeRoute = function() {
-          if (currentRouteLayer) {
-            map.removeLayer(currentRouteLayer);
-            currentRouteLayer = null;
-          }
-        };
-      </script>
-    </body>
-    </html>
-  `;
-
-  useEffect(() => {
-    let locationSubscription: Location.LocationSubscription | null = null;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const initialPos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const { latitude, longitude } = initialPos.coords;
-      setUserCoords({ lat: latitude, lng: longitude });
-      injectUserCoords(latitude, longitude, true);
-
-      locationSubscription = await Location.watchPositionAsync(
-        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 3 },
-        (newLocation) => {
-          const { latitude: newLat, longitude: newLng, speed } = newLocation.coords;
-          setUserCoords({ lat: newLat, lng: newLng });
-          injectUserCoords(newLat, newLng, false);
-          const speedKmh = Math.max(0, Math.round((speed || 0) * 3.6));
-          setCurrentSpeedKmh(speedKmh);
-          if (speedKmh > 20) setIsVehicleDetected(true);
-        }
-      );
-    })();
-    return () => { locationSubscription?.remove(); };
-  }, [onboardingDone]);
-
-  const injectUserCoords = (lat: number, lng: number, recenter: boolean) => {
-    const script = `if (window.updateUserPosition) { window.updateUserPosition(${lat}, ${lng}, ${recenter}); } true;`;
-    webViewRef.current?.injectJavaScript(script);
-  };
-
-  const handleRecenter = () => {
-    webViewRef.current?.injectJavaScript('window.centerOnUser(); true;');
-  };
-
-  const handleMessage = (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'SELECT_CAFE') {
-        const found = cafes.find((c) => c.id === data.cafeId);
-        if (found) setSelectedCafe(found);
-      } else if (data.type === 'ROUTE_READY') {
-        if (targetCafeRef.current) {
-          setActiveRoute({ cafe: targetCafeRef.current, distance: data.distance, duration: data.duration });
-          setIsArrived(false);
-          setIsVehicleDetected(false);
-        }
       }
-    } catch (e) {
-      console.error(e);
+      return post;
+    });
+    setCommunityPosts(updated);
+    savePostsToStorage(updated);
+  };
+
+  // Traçar Rota Pedestre via OSRM Foot API
+  const handleStartRoute = async (cafe: any) => {
+    if (!userLocation) {
+      Alert.alert('GPS não disponível', 'Aguardando sinal de satélite.');
+      return;
     }
-  };
-
-  const handleSelectCircuit = (circuit: any) => {
-    setActiveTab('map');
-    setActiveRoute(null);
-    setSelectedCafe(null);
-    setActiveCircuit(circuit);
-    setCircuitCompletedCafeIds([]);
-    const circuitCafes = cafes.filter((c) => circuit.cafeIds.includes(c.id));
-    const script = `if (window.traceCircuitRoute) { window.traceCircuitRoute(${JSON.stringify(circuitCafes)}); } true;`;
-    webViewRef.current?.injectJavaScript(script);
-  };
-
-  const handleCancelCircuit = () => {
-    setActiveCircuit(null);
-    setCircuitCompletedCafeIds([]);
-    webViewRef.current?.injectJavaScript('window.removeRoute(); true;');
-    handleRecenter();
-  };
-
-  const handleAdvanceCircuitStop = () => {
-    if (!activeCircuit) return;
-    const nextCafeId = activeCircuit.cafeIds.find((id: string) => !circuitCompletedCafeIds.includes(id));
-    if (nextCafeId) {
-      const newCompleted = [...circuitCompletedCafeIds, nextCafeId];
-      setCircuitCompletedCafeIds(newCompleted);
-
-      if (newCompleted.length === activeCircuit.cafeIds.length) {
-        const medalWon = activeCircuit.badge;
-        setUnlockedMedal(medalWon);
-        const currentMedals = Array.isArray(userProfile.medals) ? userProfile.medals : ['🏅 Pioneiro RunCoffee'];
-        const updatedMedals = currentMedals.includes(medalWon) ? currentMedals : [...currentMedals, medalWon];
-        const addedKm = parseFloat(activeCircuit.distance) || 3.0;
-
-        const updatedProfile = {
-          ...userProfile,
-          totalKm: parseFloat(((userProfile.totalKm || 0) + addedKm).toFixed(1)),
-          medals: updatedMedals,
-        };
-        setUserProfile(updatedProfile);
-        persistData(cafes, updatedProfile);
-
-        const newPost = {
-          id: String(Date.now()),
-          authorName: userProfile.name,
-          authorAvatar: userProfile.avatar || '🏃‍♂️',
-          timeAgo: 'Agora mesmo',
-          action: `Completou o ${activeCircuit.title}! 🏆`,
-          stats: `📍 ${activeCircuit.distance} • Desafio Oficial`,
-          comment: `Faturei a ${medalWon}! Rota incrível pelas cafeterias de Campinas.`,
-          badge: medalWon,
-          cheersCount: 1,
-          userHasCheered: true,
-        };
-        setPosts((prev) => [newPost, ...prev]);
-      }
-    }
-  };
-
-  const handleStartRoute = (cafe: any) => {
-    if (!userCoords) { Alert.alert('Aguardando GPS', 'Obtendo sinal...'); return; }
-    setActiveCircuit(null);
+    setIsCalculatingRoute(true);
     targetCafeRef.current = cafe;
-    const script = `if (window.tracePedestrianRoute) { window.tracePedestrianRoute(${userCoords.lat}, ${userCoords.lng}, ${cafe.lat}, ${cafe.lng}); } true;`;
-    webViewRef.current?.injectJavaScript(script);
-    setSelectedCafe(null);
-  };
 
-  const handleDirectCheckin = (cafe: any) => {
-    setRedeemingCafe(cafe);
-    setRedeemPointsToAdd(1);
-    setCountdown(90);
-    setShowCouponModal(true);
-    setSelectedCafe(null);
-  };
+    try {
+      const url = `https://router.project-osrm.org/route/v1/foot/${userLocation.lng},${userLocation.lat};${cafe.lng},${cafe.lat}?overview=full&geometries=geojson`;
+      const res = await fetch(url);
+      const data = await res.json();
 
-  const handleCancelRoute = () => {
-    targetCafeRef.current = null;
-    setActiveRoute(null);
-    setIsArrived(false);
-    setIsVehicleDetected(false);
-    webViewRef.current?.injectJavaScript('window.removeRoute(); true;');
-    handleRecenter();
-  };
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const coords = route.geometry.coordinates.map((pt: [number, number]) => [pt[1], pt[0]]);
+        const distanceKm = Number((route.distance / 1000).toFixed(1));
+        const durationMin = Math.round(route.duration / 60);
 
-  const handleOpenCouponFromRoute = () => {
-    if (activeRoute?.cafe) {
-      setRedeemingCafe(activeRoute.cafe);
-      if (isVehicleDetected) {
-        setRedeemPointsToAdd(1);
-        Alert.alert('🚗 Deslocamento Rápido!', 'Velocidade > 20 km/h. Validado como Check-in Avulso (+1 Visita).');
+        setActiveRoute({ cafe, distanceKm, durationMin });
+        setSelectedCafe(null);
+
+        webViewRef.current?.injectJavaScript(`
+          if (window.drawRoute) {
+            window.drawRoute(${JSON.stringify(coords)});
+          }
+          true;
+        `);
       } else {
-        setRedeemPointsToAdd(2);
+        Alert.alert('Aviso', 'Não foi possível encontrar uma rota a pé para este café.');
       }
-      setCountdown(90);
-      setShowCouponModal(true);
+    } catch {
+      Alert.alert('Erro', 'Falha ao conectar com o serviço de rotas.');
+    } finally {
+      setIsCalculatingRoute(false);
     }
   };
 
-  const handleCompleteRedemption = () => {
-    setShowCouponModal(false);
-    if (redeemingCafe) {
-      const targetCafe = redeemingCafe;
-      const isAlreadyKing = targetCafe.kingName === userProfile.name;
-      const newMyVisits = targetCafe.myVisits + redeemPointsToAdd;
-      let newKingName = targetCafe.kingName;
-      let newKingVisits = targetCafe.kingVisits;
-      const kmToAdd = redeemPointsToAdd === 2 ? 1.8 : 0;
-
-      let updatedProfile = {
-        ...userProfile,
-        totalKm: parseFloat(((userProfile.totalKm || 0) + kmToAdd).toFixed(1)),
-      };
-
-      if (!isAlreadyKing && newMyVisits > targetCafe.kingVisits) {
-        newKingName = userProfile.name;
-        newKingVisits = newMyVisits;
-        updatedProfile.crownsCount += 1;
-        setCrownVictoryData({ cafeName: targetCafe.name, oldKing: targetCafe.kingName, newVisits: newMyVisits });
+  // Cancelar Rota
+  const handleCancelRoute = () => {
+    setActiveRoute(null);
+    webViewRef.current?.injectJavaScript(`
+      if (window.clearRoute) {
+        window.clearRoute();
       }
-
-      const updatedCafes = cafes.map((c) =>
-        c.id === targetCafe.id ? { ...c, myVisits: newMyVisits, kingName: newKingName, kingVisits: newKingVisits } : c
-      );
-
-      setUserProfile(updatedProfile);
-      setCafes(updatedCafes);
-      persistData(updatedCafes, updatedProfile);
-
-      const newPost = {
-        id: String(Date.now()),
-        authorName: userProfile.name,
-        authorAvatar: userProfile.avatar || '🏃‍♂️',
-        timeAgo: 'Agora mesmo',
-        action: `Fez check-in em ${targetCafe.name} ☕`,
-        stats: redeemPointsToAdd === 2 ? '🏃 1.8 km a pé • Bônus Corrida (+2 visitas)' : '📍 Check-in Avulso (+1 visita)',
-        comment: `Aproveitando meu desconto de ${targetCafe.perk}!`,
-        badge: null,
-        cheersCount: 1,
-        userHasCheered: true,
-      };
-      setPosts((prev) => [newPost, ...prev]);
-    }
-    if (activeRoute) handleCancelRoute();
-    setRedeemingCafe(null);
+      true;
+    `);
   };
 
-  const handleToggleCheers = (postId: string) => {
-    setPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          const hasCheered = post.userHasCheered;
-          return {
-            ...post,
-            userHasCheered: !hasCheered,
-            cheersCount: hasCheered ? post.cheersCount - 1 : post.cheersCount + 1,
-          };
+  // Check-in com Anti-Cheat de Velocidade
+  const handleCheckIn = async (cafe: any) => {
+    let isSpeeding = false;
+    try {
+      const curLoc = await Location.getCurrentPositionAsync({});
+      if (curLoc.coords.speed !== null && curLoc.coords.speed !== undefined) {
+        const speedKmH = curLoc.coords.speed * 3.6;
+        if (speedKmH > 20) {
+          isSpeeding = true;
         }
-        return post;
-      })
-    );
-  };
+      }
+    } catch {}
 
-  const handleToggleEventAttendance = () => {
-    if (isEventAttending) {
-      setIsEventAttending(false);
-      setEventAttendeesCount((prev) => prev - 1);
+    const visitsEarned = isSpeeding ? 1 : 2;
+    setUserVisits((v) => v + visitsEarned);
+    setUserKm((k) => Number((k + (cafe.distanceKm || 1.5)).toFixed(1)));
+
+    if (userVisits + visitsEarned > cafe.kingVisits) {
+      setCafes((prev) =>
+        prev.map((c) =>
+          c.id === cafe.id
+            ? { ...c, currentKing: userName, kingVisits: userVisits + visitsEarned }
+            : c
+        )
+      );
+      setUserCrowns((c) => c + 1);
+      setNewReinadoInfo({ cafeName: cafe.name, visits: userVisits + visitsEarned });
+      setIsTakeoverModalVisible(true);
     } else {
-      setIsEventAttending(true);
-      setEventAttendeesCount((prev) => prev + 1);
-      Alert.alert('Presença Confirmada! 🏃‍♂️☕', 'Te esperamos sábado às 08h na Praça Arautos da Paz (Taquaral).');
+      Alert.alert(
+        isSpeeding ? 'Check-in Motorizado! 🚗' : 'Check-in Esportivo! 🏃‍♂️',
+        isSpeeding
+          ? `Velocidade alta detectada. Você ganhou +1 visita em ${cafe.name}. Corra ou caminhe para ganhar o dobro!`
+          : `Sensacional! Você ganhou +2 visitas em ${cafe.name} pelo esforço a pé!`
+      );
     }
   };
 
-  const handleUseCurrentLocationForCafe = () => {
-    if (userCoords) {
-      setFormLat(userCoords.lat.toFixed(4));
-      setFormLng(userCoords.lng.toFixed(4));
-      Alert.alert('GPS Capturado 📍', 'Coordenadas preenchidas com sucesso!');
-    }
-  };
-
-  const handleSaveNewCafe = () => {
-    if (!formName.trim() || !formAddress.trim()) {
-      Alert.alert('Atenção', 'Informe nome e endereço.');
+  // Salvar Indicação de Café
+  const handleSaveNomination = () => {
+    if (!nominateName.trim() || !nominateAddress.trim()) {
+      Alert.alert('Atenção', 'Informe pelo menos o nome e endereço da cafeteria.');
       return;
     }
     const newCafe = {
       id: String(Date.now()),
-      name: formName.trim(),
-      shortName: formName.trim().split(' ')[0],
-      address: formAddress.trim(),
-      lat: parseFloat(formLat) || -22.8990,
-      lng: parseFloat(formLng) || -47.0510,
-      kingName: 'Sem Rei',
-      kingVisits: 0,
-      myVisits: 0,
-      perk: formPerk.trim() || '10% de boas-vindas RunCoffee',
-      instagram: formInstagram.trim() || '@cafeteria',
+      name: nominateName.trim(),
+      lat: userLocation ? userLocation.lat + 0.003 : -22.9000,
+      lng: userLocation ? userLocation.lng + 0.003 : -47.0500,
+      address: nominateAddress.trim(),
+      neighborhood: 'Cambuí',
+      currentKing: 'Disputa Aberta',
+      kingVisits: 3,
+      perk: nominatePerk.trim() || 'Benefício em análise com o barista',
+      distanceKm: 1.2,
+      isPartner: false,
     };
-    const updatedCafes = [...cafes, newCafe];
-    setCafes(updatedCafes);
-    persistData(updatedCafes, userProfile);
-    setFormName(''); setFormAddress(''); setFormInstagram(''); setFormPerk('');
-    setShowAddCafeModal(false);
-    Alert.alert('Sucesso!', `${newCafe.name} adicionado ao mapa.`);
+    setCafes([newCafe, ...cafes]);
+    setIsNominateModalVisible(false);
+    setNominateName('');
+    setNominateAddress('');
+    setNominateInstagram('');
+    setNominatePerk('');
+    Alert.alert('Café Indicado! ☕', 'Sua indicação foi adicionada ao mapa para validação do Club.');
   };
 
-  const handleResetData = () => {
-    Alert.alert('Resetar Placar', 'Deseja resetar os dados de teste?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Resetar',
-        style: 'destructive',
-        onPress: async () => {
-          await AsyncStorage.clear();
-          setCafes(INITIAL_CAFES);
-          setUserProfile(INITIAL_PROFILE);
-          setOnboardingDone(false);
-          setOnboardingStep(0);
-          Alert.alert('Pronto', 'Dados reiniciados e Onboarding liberado.');
-        },
-      },
-    ]);
-  };
+  // Leaflet HTML com Google Maps e Marcadores Filtrados
+  const leafletHTML = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #E5E7EB; }
+          .cafe-pill {
+            background: #FFFFFF;
+            border-radius: 20px;
+            padding: 5px 11px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #1C1917;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+            border: 2px solid #EA580C;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+          }
+          .cafe-pill.king {
+            border-color: #D97706;
+            background: #FFFBEB;
+          }
+          .cafe-pill-tip {
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 6px solid #EA580C;
+          }
+          .cafe-pill.king .cafe-pill-tip {
+            border-top-color: #D97706;
+          }
+          .pulse-marker {
+            width: 18px;
+            height: 18px;
+            background: #EA580C;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(234, 88, 12, 0.7);
+            position: relative;
+          }
+          .pulse-marker::after {
+            content: '';
+            position: absolute;
+            top: -9px;
+            left: -9px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: rgba(234, 88, 12, 0.35);
+            animation: radar 2s infinite ease-out;
+          }
+          @keyframes radar {
+            0% { transform: scale(0.6); opacity: 1; }
+            100% { transform: scale(2.2); opacity: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var center = [${userLocation?.lat || -22.9020}, ${userLocation?.lng || -47.0540}];
+          var map = L.map('map', { zoomControl: false }).setView(center, 14);
 
-  // =========================================================================
-  // TELA DE ONBOARDING
-  // =========================================================================
-  if (onboardingDone === false) {
-    const isSignupStep = onboardingStep === 3;
-    const currentSlide = ONBOARDING_SLIDES[onboardingStep] || ONBOARDING_SLIDES[0];
+          // Google Maps Oficial
+          L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: '&copy; Google Maps'
+          }).addTo(map);
 
-    return (
-      <View style={styles.onboardingContainer}>
-        <StatusBar style="light" />
+          // GPS do Usuário
+          var userIcon = L.divIcon({
+            className: 'custom-user-icon',
+            html: '<div class="pulse-marker"></div>',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+          });
+          L.marker(center, { icon: userIcon }).addTo(map);
 
-        <View style={styles.onboardingTopBar}>
-          <Text style={styles.onboardingBrand}>RunCoffee ☕🏃</Text>
-          {!isSignupStep && (
-            <TouchableOpacity onPress={() => setOnboardingStep(3)}>
-              <Text style={styles.onboardingSkipText}>Pular</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          // Adicionar Cafeterias Filtradas
+          var cafesData = ${JSON.stringify(filteredCafes)};
+          cafesData.forEach(function(cafe) {
+            var isKing = cafe.currentKing && cafe.currentKing !== 'Disputa Aberta';
+            var crownBadge = isKing ? ' 👑' : '';
+            var html = '<div class="cafe-pill ' + (isKing ? 'king' : '') + '">' +
+                       '<span>☕ ' + cafe.name.split(' ')[0] + crownBadge + '</span>' +
+                       '<div class="cafe-pill-tip"></div>' +
+                       '</div>';
 
-        {!isSignupStep ? (
-          <View style={styles.onboardingSlideContent}>
-            <View style={styles.onboardingIconCircle}>
-              <Text style={styles.onboardingBigIcon}>{currentSlide.icon}</Text>
-            </View>
-            <Text style={styles.onboardingSlideTitle}>{currentSlide.title}</Text>
-            <Text style={styles.onboardingSlideSubtitle}>{currentSlide.subtitle}</Text>
-          </View>
-        ) : (
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-            style={styles.onboardingSignupContent}
-          >
-            <Text style={styles.signupBadge}>PERFIL DE ATLETA</Text>
-            <Text style={styles.signupTitle}>Como quer ser chamado?</Text>
-            <Text style={styles.signupSubtitle}>Sua foto e nome aparecerão no trono das cafeterias de Campinas.</Text>
+            var icon = L.divIcon({
+              className: 'custom-cafe-icon',
+              html: html,
+              iconSize: [110, 32],
+              iconAnchor: [55, 36]
+            });
 
-            <TouchableOpacity style={styles.photoPickerContainer} onPress={handlePickImage}>
-              {signupPhotoUri ? (
-                <Image source={{ uri: signupPhotoUri }} style={styles.avatarUploadedImg} />
-              ) : (
-                <View style={styles.photoPlaceholder}>
-                  <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                  <Text style={styles.photoPlaceholderText}>Subir Foto</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            var m = L.marker([cafe.lat, cafe.lng], { icon: icon }).addTo(map);
+            m.on('click', function() {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_CAFE', cafeId: cafe.id }));
+            });
+          });
 
-            <TextInput
-              style={styles.signupInput}
-              value={signupName}
-              onChangeText={setSignupName}
-              placeholder="Seu nome ou apelido"
-              placeholderTextColor="#999"
-            />
+          // Rota Pedestre
+          var currentRouteLine = null;
+          window.drawRoute = function(latLngArray) {
+            if (currentRouteLine) { map.removeLayer(currentRouteLine); }
+            currentRouteLine = L.polyline(latLngArray, { color: '#EA580C', weight: 6, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+            map.fitBounds(currentRouteLine.getBounds(), { padding: [50, 50] });
+          };
+          window.clearRoute = function() {
+            if (currentRouteLine) { map.removeLayer(currentRouteLine); currentRouteLine = null; }
+          };
+          window.centerMap = function(lat, lng) {
+            map.setView([lat, lng], 16, { animate: true });
+          };
+          window.centerMapWithZoom = function(lat, lng, zoom) {
+            map.setView([lat, lng], zoom, { animate: true });
+          };
+        </script>
+      </body>
+    </html>
+  `;
 
-            {!signupPhotoUri && (
-              <>
-                <Text style={styles.avatarPickerLabel}>Ou escolha um ícone rápido:</Text>
-                <View style={styles.avatarRow}>
-                  {['🏃‍♂️', '🏃‍♀️', '☕', '⚡', '🕶️'].map((av) => (
-                    <TouchableOpacity
-                      key={av}
-                      style={[styles.avatarChoiceBtn, signupAvatar === av ? styles.avatarChoiceSelected : null]}
-                      onPress={() => setSignupAvatar(av)}
-                    >
-                      <Text style={styles.avatarChoiceText}>{av}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </>
-            )}
-          </KeyboardAvoidingView>
-        )}
-
-        <View style={styles.onboardingFooter}>
-          <View style={styles.dotsRow}>
-            {[0, 1, 2, 3].map((dot) => (
-              <View 
-                key={dot} 
-                style={[styles.dotPill, onboardingStep === dot ? styles.dotPillActive : null]} 
-              />
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={styles.onboardingNextBtn}
-            onPress={() => {
-              if (onboardingStep < 3) {
-                setOnboardingStep(prev => prev + 1);
-              } else {
-                handleFinishOnboarding();
-              }
-            }}
-          >
-            <Text style={styles.onboardingNextBtnText}>
-              {onboardingStep < 3 ? 'Avançar ➔' : 'Entrar no Circuito 🚀'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // =========================================================================
-  // APP PRINCIPAL
-  // =========================================================================
   return (
-    <View style={styles.container}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar style="light" />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1C1917" />
 
-      {/* CABEÇALHO */}
+      {/* Cabeçalho */}
       <View style={styles.header}>
-        <View style={styles.headerTopRow}>
-          <View>
-            <Text style={styles.headerTitle}>RunCoffee</Text>
-            <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano ☕</Text>
-          </View>
-          <TouchableOpacity style={styles.headerAddBtn} onPress={() => setShowAddCafeModal(true)}>
-            <Text style={styles.headerAddBtnText}>➕ Indicar Café</Text>
-          </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>RunCoffee</Text>
+          <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano ☕</Text>
         </View>
+        <TouchableOpacity
+          style={styles.nominateHeaderButton}
+          onPress={() => setIsNominateModalVisible(true)}
+        >
+          <Text style={styles.nominateHeaderButtonText}>+ Indicar Café</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.tabContentArea}>
+      {/* Conteúdo Principal */}
+      <View style={styles.mainContent}>
+        {/* ABA 1: MAPA */}
+        {activeTab === 'mapa' && (
+          <View style={styles.tabContainer}>
+            {/* Pílulas de Filtro por Bairro */}
+            <View style={styles.filterPillsWrapper}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterPillsContainer}
+              >
+                {['Todos', 'Cambuí', 'Centro', 'Bosque', 'Barão Geraldo'].map((bairro) => (
+                  <TouchableOpacity
+                    key={bairro}
+                    style={[
+                      styles.filterPill,
+                      selectedNeighborhood === bairro && styles.filterPillActive,
+                    ]}
+                    onPress={() => handleSelectNeighborhood(bairro)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        selectedNeighborhood === bairro && styles.filterPillTextActive,
+                      ]}
+                    >
+                      {bairro}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
 
-        {/* ==================== ABA 1: MAPA ==================== */}
-        {activeTab === 'map' && (
-          <View style={{ flex: 1 }}>
             <WebView
+              key={selectedNeighborhood}
               ref={webViewRef}
               originWhitelist={['*']}
-              source={{ html: mapHtml }}
-              style={styles.webview}
-              onMessage={handleMessage}
+              source={{ html: leafletHTML }}
+              style={styles.mapWebView}
+              onMessage={(event) => {
+                try {
+                  const data = JSON.parse(event.nativeEvent.data);
+                  if (data.type === 'SELECT_CAFE') {
+                    const found = cafes.find((c) => c.id === data.cafeId);
+                    if (found) setSelectedCafe(found);
+                  }
+                } catch (e) {}
+              }}
             />
 
-            <TouchableOpacity style={styles.gpsButton} onPress={handleRecenter}>
-              <Text style={styles.gpsButtonText}>🎯</Text>
+            {/* Centralizar no GPS */}
+            <TouchableOpacity
+              style={styles.centerLocationButton}
+              onPress={() => {
+                if (userLocation) {
+                  webViewRef.current?.injectJavaScript(`
+                    if (window.centerMap) {
+                      window.centerMap(${userLocation.lat}, ${userLocation.lng});
+                    }
+                    true;
+                  `);
+                }
+              }}
+            >
+              <Text style={{ fontSize: 20 }}>🎯</Text>
             </TouchableOpacity>
 
-            {activeCircuit && (
-              <View style={styles.circuitSheet}>
-                <View style={styles.routeHeaderRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.circuitBadgeLabel}>{activeCircuit.badge}</Text>
-                    <Text style={styles.routeDest}>{activeCircuit.title}</Text>
-                  </View>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelCircuit}>
-                    <Text style={styles.cancelBtnText}>✕ Sair</Text>
-                  </TouchableOpacity>
+            {/* Card de Rota Pedestre Ativa */}
+            {activeRoute && (
+              <View style={styles.activeRouteCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.activeRouteTitle}>
+                    🚶 Rumo a {activeRoute.cafe.name}
+                  </Text>
+                  <Text style={styles.activeRouteStats}>
+                    {activeRoute.distanceKm} km • ~{activeRoute.durationMin} min a pé
+                  </Text>
                 </View>
-
-                <Text style={styles.circuitProgressText}>
-                  🏁 {circuitCompletedCafeIds.length} de {activeCircuit.cafeIds.length} paradas carimbadas
-                </Text>
-
-                <View style={styles.stopsList}>
-                  {activeCircuit.cafeIds.map((cId: string, index: number) => {
-                    const cafeObj = cafes.find((c) => c.id === cId);
-                    const isChecked = circuitCompletedCafeIds.includes(cId);
-                    return (
-                      <View key={cId} style={styles.stopItem}>
-                        <Text style={styles.stopIcon}>{isChecked ? '✅' : '📍'}</Text>
-                        <Text style={[styles.stopName, isChecked ? styles.stopNameChecked : null]}>
-                          {index + 1}. {cafeObj?.name}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-
-                {circuitCompletedCafeIds.length < activeCircuit.cafeIds.length ? (
-                  <TouchableOpacity 
-                    style={styles.simulateStopBtn}
-                    onPress={handleAdvanceCircuitStop}
-                  >
-                    <Text style={styles.simulateStopBtnText}>🧪 Carimbar Próxima Parada</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.circuitDoneBox}
-                    onPress={() => setUnlockedMedal(activeCircuit.badge)}
-                  >
-                    <Text style={styles.circuitDoneText}>🎉 Circuito 100% Concluído!</Text>
-                    <Text style={styles.circuitDoneSubText}>Toque aqui para ver sua Medalha 🏅</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.cancelRouteButton}
+                  onPress={handleCancelRoute}
+                >
+                  <Text style={styles.cancelRouteButtonText}>Finalizar</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            {!activeCircuit && activeRoute && (
-              <View style={styles.activeRouteSheet}>
-                <View style={styles.routeHeaderRow}>
+            {/* Card BottomSheet da Cafeteria Selecionada */}
+            {selectedCafe && !activeRoute && (
+              <View style={styles.cafeBottomSheet}>
+                <View style={styles.bottomSheetHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.routeTitle}>
-                      {isArrived ? '🎉 Você chegou!' : '🏃 Rota em Andamento'}
-                    </Text>
-                    <Text style={styles.routeDest}>{activeRoute.cafe?.name}</Text>
-                  </View>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelRoute}>
-                    <Text style={styles.cancelBtnText}>✕ Sair</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {isVehicleDetected && (
-                  <View style={styles.vehicleAlertBox}>
-                    <Text style={styles.vehicleAlertText}>
-                      ⚠️ Velocidade &gt; 20 km/h! Convertido em visita normal (+1).
-                    </Text>
-                  </View>
-                )}
-
-                {!isArrived ? (
-                  <>
-                    <View style={styles.statsRow}>
-                      <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Distância</Text>
-                        <Text style={styles.statValue}>📍 {activeRoute.distance}</Text>
-                      </View>
-                      <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Tempo a pé</Text>
-                        <Text style={styles.statValue}>⏱️ {activeRoute.duration}</Text>
-                      </View>
-                      <View style={styles.statBox}>
-                        <Text style={styles.statLabel}>Velocidade</Text>
-                        <Text style={[styles.statValue, currentSpeedKmh > 20 ? { color: '#C85A32' } : null]}>
-                          ⚡ {currentSpeedKmh} km/h
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.simulationRow}>
-                      <TouchableOpacity 
-                        style={styles.simulateWalkBtn} 
-                        onPress={() => {
-                          setIsVehicleDetected(false);
-                          setIsArrived(true);
-                        }}
-                      >
-                        <Text style={styles.simulateWalkText}>🏃 Simular a Pé</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity 
-                        style={styles.simulateCarBtn} 
-                        onPress={() => {
-                          setIsVehicleDetected(true);
-                          setIsArrived(true);
-                        }}
-                      >
-                        <Text style={styles.simulateCarText}>🚗 Simular Carro</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </>
-                ) : (
-                  <TouchableOpacity style={styles.checkinButton} onPress={handleOpenCouponFromRoute}>
-                    <Text style={styles.checkinButtonText}>
-                      {isVehicleDetected ? '📍 Check-in Automóvel (+1 Visita)' : '🎁 Check-in Corrida (+2 Visitas)'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {!activeCircuit && !activeRoute && selectedCafe && (
-              <View style={styles.bottomSheet}>
-                <View style={styles.sheetHeader}>
-                  <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={styles.cafeTitle}>{selectedCafe.name}</Text>
-                    <Text style={styles.cafeAddress}>{selectedCafe.address}</Text>
-                    {selectedCafe.instagram ? (
-                      <Text style={styles.cafeInstagram}>{selectedCafe.instagram}</Text>
-                    ) : null}
+                    <Text style={styles.bottomSheetTitle}>{selectedCafe.name}</Text>
+                    <Text style={styles.bottomSheetAddress}>{selectedCafe.address}</Text>
                   </View>
                   <TouchableOpacity onPress={() => setSelectedCafe(null)}>
-                    <Text style={styles.closeBtn}>✕</Text>
+                    <Text style={{ color: '#A8A29E', fontSize: 18 }}>✕</Text>
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.badgesContainer}>
-                  <View style={[
-                    styles.kingBadge,
-                    selectedCafe.kingName === userProfile.name ? styles.myKingBadge : null
-                  ]}>
-                    <Text style={styles.kingText}>
-                      {selectedCafe.kingName === userProfile.name
-                        ? `👑 VOCÊ É O REI! (${selectedCafe.kingVisits} visitas)`
-                        : `👑 Rei: ${selectedCafe.kingName} (${selectedCafe.kingVisits} visitas) • Suas: ${selectedCafe.myVisits}`}
+                {/* Badge do Rei Atual */}
+                <View style={styles.reinadoBox}>
+                  <Text style={{ fontSize: 18 }}>👑</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.reinadoKingName}>
+                      Rei do Mês: <Text style={{ color: '#F59E0B' }}>{selectedCafe.currentKing}</Text>
+                    </Text>
+                    <Text style={styles.reinadoVisits}>
+                      {selectedCafe.kingVisits} visitas acumuladas este mês
                     </Text>
                   </View>
-
-                  <View style={styles.perkBadge}>
-                    <Text style={styles.perkText}>🎁 {selectedCafe.perk}</Text>
-                  </View>
                 </View>
 
-                <View style={styles.modalitiesContainer}>
+                {/* Benefício / Perk */}
+                <View style={styles.perkBox}>
+                  <Text style={{ fontSize: 18 }}>🎁</Text>
+                  <Text style={styles.perkText}>{selectedCafe.perk}</Text>
+                </View>
+
+                {/* Ações */}
+                <View style={styles.bottomSheetActions}>
                   <TouchableOpacity
-                    style={styles.btnRoute}
+                    style={[styles.actionBtn, styles.routeBtn]}
                     onPress={() => handleStartRoute(selectedCafe)}
+                    disabled={isCalculatingRoute}
                   >
-                    <Text style={styles.btnText}>🏃 Ir a Pé (+2 Visitas)</Text>
+                    {isCalculatingRoute ? (
+                      <ActivityIndicator color="#FFF" size="small" />
+                    ) : (
+                      <Text style={styles.actionBtnText}>🚶 Traçar Rota</Text>
+                    )}
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={styles.btnPitStop}
-                    onPress={() => handleDirectCheckin(selectedCafe)}
+                    style={[styles.actionBtn, styles.checkInBtn]}
+                    onPress={() => handleCheckIn(selectedCafe)}
                   >
-                    <Text style={styles.btnPitStopText}>📍 Check-in Avulso (+1 Visita)</Text>
+                    <Text style={styles.actionBtnText}>📍 Check-in</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.perkBtn]}
+                    onPress={() => {
+                      setPerkTimer(90);
+                      setIsPerkModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.actionBtnText}>☕ Resgatar</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1278,1744 +844,1041 @@ export default function App() {
           </View>
         )}
 
-        {/* ==================== ABA 2: CIRCUITOS ==================== */}
-        {activeTab === 'circuits' && (
-          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
-            <Text style={styles.tabSectionTitle}>Desafios Urbanos 🏃‍♂️☕</Text>
-            <Text style={styles.tabSectionSubtitle}>
-              Conecte cafeterias a pé, fature medalhas colecionáveis e dispute o trono de Campinas.
+        {/* ABA 2: CIRCUITOS */}
+        {activeTab === 'circuitos' && (
+          <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16 }}>
+            <Text style={styles.sectionHeading}>🏃 Circuitos de Cafeterias</Text>
+            <Text style={styles.sectionSubheading}>
+              Complete as rotas a pé, visite os checkpoints e desbloqueie medalhas exclusivas para o seu perfil.
             </Text>
 
-            {CIRCUITS.map((circ) => {
-              const circuitCafes = cafes.filter((c) => circ.cafeIds.includes(c.id));
-              const hasMedal = userProfile.medals?.includes(circ.badge);
-
-              return (
-                <View key={circ.id} style={styles.circuitCard}>
-                  <View style={styles.circuitCardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.circuitCardBadge}>{circ.badge}</Text>
-                      <Text style={styles.circuitCardTitle}>{circ.title}</Text>
-                    </View>
-                    <View style={styles.distanceBadge}>
-                      <Text style={styles.distanceBadgeText}>{circ.distance}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.circuitCardDesc}>{circ.desc}</Text>
-
-                  <View style={styles.circuitCardStopsBox}>
-                    <Text style={styles.circuitCardStopsTitle}>Paradas Obrigatórias:</Text>
-                    {circuitCafes.map((c) => (
-                      <Text key={c.id} style={styles.circuitCardStopText}>
-                        • {c.name} ({c.address.split('-')[1]?.trim() || 'Campinas'})
-                      </Text>
-                    ))}
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.startCircuitBtn}
-                    onPress={() => handleSelectCircuit(circ)}
-                  >
-                    <Text style={styles.startCircuitBtnText}>
-                      {hasMedal ? 'Correr Novamente 🏃' : 'Iniciar Desafio no Mapa 🚀'}
-                    </Text>
-                  </TouchableOpacity>
+            {circuits.map((c) => (
+              <View key={c.id} style={styles.circuitCard}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={styles.circuitTitle}>{c.title}</Text>
+                  <Text style={styles.circuitPill}>{c.distance}</Text>
                 </View>
-              );
-            })}
-            <View style={{ height: 40 }} />
+                <Text style={styles.circuitDesc}>{c.description}</Text>
+
+                <View style={styles.checkpointContainer}>
+                  {c.cafes.map((cafe, i) => (
+                    <View key={i} style={styles.checkpointItem}>
+                      <Text style={{ color: i < c.progress ? '#10B981' : '#78716C', fontSize: 14 }}>
+                        {i < c.progress ? '✅' : '⚪'} {cafe}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.circuitRewardBox}>
+                  <Text style={{ color: '#D97706', fontWeight: 'bold' }}>
+                    Recompensa: {c.badgeAwarded}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.startCircuitBtn}
+                  onPress={() => {
+                    Alert.alert('Circuito Iniciado!', `Primeira parada definida para ${c.cafes[0]}. Bom treino!`);
+                    setActiveTab('mapa');
+                  }}
+                >
+                  <Text style={styles.startCircuitBtnText}>Iniciar Circuito</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
           </ScrollView>
         )}
 
-        {/* ==================== ABA 3: COMUNIDADE ==================== */}
-        {activeTab === 'community' && (
-          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
-            <Text style={styles.communitySectionTitle}>👑 Reis de Campinas nesta Semana</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kingsCarousel}>
-              {cafes.map((cafe) => (
-                <View key={cafe.id} style={styles.kingCarouselCard}>
-                  <View style={styles.kingCrownBadge}>
-                    <Text style={{ fontSize: 13 }}>👑</Text>
-                  </View>
-                  <View style={styles.kingAvatarCircle}>
-                    <Text style={{ fontSize: 20 }}>
-                      {cafe.kingName === userProfile.name ? (userProfile.avatar || '🏃‍♂️') : '☕'}
-                    </Text>
-                  </View>
-                  <Text style={styles.kingCardName} numberOfLines={1}>
-                    {cafe.kingName === userProfile.name ? 'Você!' : cafe.kingName}
-                  </Text>
-                  <Text style={styles.kingCardCafe} numberOfLines={1}>{cafe.shortName || cafe.name.split(' ')[0]}</Text>
-                  <Text style={styles.kingCardVisits}>{cafe.kingVisits} visitas</Text>
+        {/* ABA 3: COMUNIDADE */}
+        {activeTab === 'comunidade' && (
+          <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16 }}>
+            {/* Card do Encontro do Club */}
+            <View style={styles.clubEventCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Text style={{ fontSize: 26 }}>⚡</Text>
+                <View>
+                  <Text style={styles.clubEventTitle}>Treino Coletivo de Sábado</Text>
+                  <Text style={styles.clubEventSubtitle}>08:00 • Lagoa do Taquaral ➡️ Cambuí</Text>
                 </View>
-              ))}
-            </ScrollView>
-
-            <View style={styles.eventCard}>
-              <View style={styles.eventHeaderRow}>
-                <Text style={styles.eventTag}>🏃‍♂️ TREINO COLETIVO</Text>
-                <Text style={styles.eventDate}>Sábado • 08h00</Text>
               </View>
-              <Text style={styles.eventTitle}>Coffee Run Taquaral ➔ Cambuí (5k)</Text>
-              <Text style={styles.eventDesc}>
-                Saída na Praça Arautos da Paz, volta pela lagoa e chegada com café especial e hidratação na Abigail Coffee Co.
+              <Text style={styles.clubEventDesc}>
+                Ritmo leve de 6km finalizando com confraternização e café no Abigail Coffee Co.
               </Text>
-              <TouchableOpacity 
-                style={[styles.eventAttendBtn, isEventAttending ? styles.eventAttendingActive : null]}
-                onPress={handleToggleEventAttendance}
+              <TouchableOpacity
+                style={[
+                  styles.clubEventButton,
+                  isRunClubJoined && { backgroundColor: '#10B981' },
+                ]}
+                onPress={() => {
+                  setIsRunClubJoined(!isRunClubJoined);
+                  Alert.alert(
+                    !isRunClubJoined ? 'Presença Confirmada! 🏃‍♂️' : 'Presença Cancelada',
+                    !isRunClubJoined
+                      ? 'Te esperamos sábado às 08h no portão 1 da Lagoa!'
+                      : 'Você removeu sua confirmação.'
+                  );
+                }}
               >
-                <Text style={[styles.eventAttendBtnText, isEventAttending ? styles.eventAttendingActiveText : null]}>
-                  {isEventAttending ? '✓ Presença Confirmada!' : `Bora Correr Junto! (${eventAttendeesCount} atletas)`}
+                <Text style={styles.clubEventButtonText}>
+                  {isRunClubJoined ? '✓ Presença Confirmada' : 'Eu Vou! 🙋‍♂️'}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.communitySectionTitle}>☕ Feed de Atividades</Text>
-            {posts.map((post) => (
-              <View key={post.id} style={styles.feedCard}>
-                <View style={styles.feedCardHeader}>
-                  <View style={styles.feedAvatarCircle}>
-                    <Text style={{ fontSize: 20 }}>{post.authorAvatar}</Text>
-                  </View>
+            {/* Botão de Somar / Postar no Feed */}
+            <TouchableOpacity
+              style={styles.postActionButton}
+              onPress={() => setIsPostModalVisible(true)}
+            >
+              <Text style={{ fontSize: 18 }}>✍️</Text>
+              <Text style={styles.postActionButtonText}>
+                Compartilhar Treino ou Café
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={[styles.sectionHeading, { marginTop: 12 }]}>
+              ☕ Feed da Comunidade
+            </Text>
+
+            {communityPosts.map((post) => (
+              <View key={post.id} style={styles.postCard}>
+                <View style={styles.postHeader}>
+                  <Text style={{ fontSize: 24, marginRight: 10 }}>{post.avatar}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.feedAuthorName}>{post.authorName}</Text>
-                    <Text style={styles.feedActionText}>{post.action}</Text>
+                    <Text style={styles.postAuthor}>{post.userName}</Text>
+                    <Text style={styles.postTime}>
+                      {post.timeAgo} • <Text style={{ color: '#D97706' }}>{post.cafeName}</Text>
+                    </Text>
                   </View>
-                  <Text style={styles.feedTimeAgo}>{post.timeAgo}</Text>
                 </View>
 
-                {post.stats ? (
-                  <View style={styles.feedStatsBox}>
-                    <Text style={styles.feedStatsText}>{post.stats}</Text>
-                  </View>
-                ) : null}
+                <Text style={styles.postText}>{post.text}</Text>
 
-                {post.comment ? (
-                  <Text style={styles.feedCommentText}>"{post.comment}"</Text>
-                ) : null}
+                {post.photo && (
+                  <Image source={{ uri: post.photo }} style={styles.postImage} />
+                )}
 
-                {post.badge ? (
-                  <View style={styles.feedBadgePill}>
-                    <Text style={styles.feedBadgeText}>{post.badge}</Text>
-                  </View>
-                ) : null}
-
-                <View style={styles.feedFooterRow}>
-                  <TouchableOpacity 
-                    style={[styles.cheersButton, post.userHasCheered ? styles.cheersButtonActive : null]}
-                    onPress={() => handleToggleCheers(post.id)}
+                <View style={styles.postFooter}>
+                  <TouchableOpacity
+                    style={[
+                      styles.cheerButton,
+                      post.hasCheered && styles.cheerButtonActive,
+                    ]}
+                    onPress={() => handleToggleCheer(post.id)}
                   >
-                    <Text style={styles.cheersIcon}>☕</Text>
-                    <Text style={[styles.cheersText, post.userHasCheered ? styles.cheersTextActive : null]}>
-                      {post.userHasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheersCount})
+                    <Text style={{ fontSize: 16 }}>☕</Text>
+                    <Text
+                      style={[
+                        styles.cheerButtonText,
+                        post.hasCheered && { color: '#D97706', fontWeight: 'bold' },
+                      ]}
+                    >
+                      {post.hasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheers})
                     </Text>
                   </TouchableOpacity>
-                  <Text style={styles.feedCityTag}>📍 Campinas, SP</Text>
                 </View>
               </View>
             ))}
+
             <View style={{ height: 40 }} />
           </ScrollView>
         )}
 
-        {/* ==================== ABA 4: PERFIL ==================== */}
-        {activeTab === 'profile' && (
-          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
+        {/* ABA 4: PERFIL */}
+        {activeTab === 'perfil' && (
+          <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16 }}>
             <View style={styles.profileHeaderCard}>
-              <TouchableOpacity style={styles.avatarCircle} onPress={handlePickImage}>
-                {userProfile.photoUri ? (
-                  <Image source={{ uri: userProfile.photoUri }} style={styles.avatarProfileImg} />
-                ) : (
-                  <Text style={styles.avatarText}>{userProfile.avatar || '🏃‍♂️'}</Text>
-                )}
-                <View style={styles.editPhotoBadge}>
-                  <Text style={{ fontSize: 10 }}>📷</Text>
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.profileBigName}>{userProfile.name}</Text>
-              <Text style={styles.profileRoleText}>Coffee Explorer • Campinas</Text>
+              <View style={styles.profileAvatarBox}>
+                <Text style={{ fontSize: 44 }}>{userAvatar}</Text>
+              </View>
+              <Text style={styles.profileName}>{userName}</Text>
+              <Text style={styles.profileLocation}>Campinas / SP • Nível 1 Club</Text>
+            </View>
 
-              <View style={styles.profileStatsGrid}>
-                <View style={styles.profileGridItem}>
-                  <Text style={styles.profileGridVal}>🏃 {userProfile.totalKm}</Text>
-                  <Text style={styles.profileGridLabel}>km a pé</Text>
-                </View>
-                <View style={styles.profileGridItem}>
-                  <Text style={styles.profileGridVal}>👑 {userProfile.crownsCount}</Text>
-                  <Text style={styles.profileGridLabel}>Reinados</Text>
-                </View>
-                <View style={styles.profileGridItem}>
-                  <Text style={styles.profileGridVal}>🏅 {userProfile.medals?.length || 0}</Text>
-                  <Text style={styles.profileGridLabel}>Medalhas</Text>
-                </View>
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{userKm} km</Text>
+                <Text style={styles.statLabel}>Distância</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{userVisits}</Text>
+                <Text style={styles.statLabel}>Visitas</Text>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{userCrowns}</Text>
+                <Text style={styles.statLabel}>Reinados 👑</Text>
               </View>
             </View>
 
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>🏆 Suas Medalhas</Text>
-              <View style={styles.medalsWrap}>
-                {userProfile.medals?.map((med, idx) => (
-                  <View key={idx} style={styles.medalPill}>
-                    <Text style={styles.medalPillText}>{med}</Text>
-                  </View>
-                ))}
+            <Text style={styles.sectionHeading}>🏅 Medalhas & Conquistas</Text>
+            <View style={styles.medalsContainer}>
+              {userMedals.map((m, idx) => (
+                <View key={idx} style={styles.medalPill}>
+                  <Text style={styles.medalPillText}>{m}</Text>
+                </View>
+              ))}
+              <View style={[styles.medalPill, { opacity: 0.4 }]}>
+                <Text style={styles.medalPillText}>🔒 Circuito Cambuí</Text>
+              </View>
+              <View style={[styles.medalPill, { opacity: 0.4 }]}>
+                <Text style={styles.medalPillText}>🔒 10 Cafés Diferentes</Text>
               </View>
             </View>
-
-            <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>👑 Seus Reinados em Campinas</Text>
-              {cafes.filter((c) => c.kingName === userProfile.name).length > 0 ? (
-                cafes
-                  .filter((c) => c.kingName === userProfile.name)
-                  .map((c) => (
-                    <View key={c.id} style={styles.kingCafeCard}>
-                      <Text style={styles.kingCafeTitle}>☕ {c.name}</Text>
-                      <Text style={styles.kingCafeDesc}>
-                        Você é o Rei atual com {c.kingVisits} visitas registradas.
-                      </Text>
-                    </View>
-                  ))
-              ) : (
-                <Text style={styles.noKingsText}>Você ainda não possui reinados. Corra até uma cafeteria para assumir a coroa!</Text>
-              )}
-            </View>
-
-            <TouchableOpacity 
-              style={styles.seeOnboardingBtn}
-              onPress={() => {
-                setOnboardingStep(0);
-                setOnboardingDone(false);
-              }}
-            >
-              <Text style={styles.seeOnboardingBtnText}>✨ Rever Apresentação do App</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.resetBtn} onLongPress={handleResetData}>
-              <Text style={styles.resetBtnText}>Segure para Resetar Dados de Teste</Text>
-            </TouchableOpacity>
           </ScrollView>
         )}
-
       </View>
 
-      {/* BARRA INFERIOR DE NAVEGAÇÃO REFINADA */}
+      {/* BARRA INFERIOR (BOTTOM TABS) */}
       <View style={styles.bottomTabBar}>
-        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('map')}>
-          <Text style={[styles.tabIcon, activeTab === 'map' ? styles.tabIconActive : null]}>🗺️</Text>
-          <Text style={[styles.tabLabel, activeTab === 'map' ? styles.tabLabelActive : null]}>Mapa</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('mapa')}>
+          <Text style={{ fontSize: 20 }}>🗺️</Text>
+          <Text style={[styles.tabLabel, activeTab === 'mapa' && styles.tabLabelActive]}>
+            Mapa
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('circuits')}>
-          <Text style={[styles.tabIcon, activeTab === 'circuits' ? styles.tabIconActive : null]}>🏃</Text>
-          <Text style={[styles.tabLabel, activeTab === 'circuits' ? styles.tabLabelActive : null]}>Circuitos</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('circuitos')}>
+          <Text style={{ fontSize: 20 }}>🏃</Text>
+          <Text style={[styles.tabLabel, activeTab === 'circuitos' && styles.tabLabelActive]}>
+            Circuitos
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('community')}>
-          <Text style={[styles.tabIcon, activeTab === 'community' ? styles.tabIconActive : null]}>👥</Text>
-          <Text style={[styles.tabLabel, activeTab === 'community' ? styles.tabLabelActive : null]}>Comunidade</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('comunidade')}>
+          <Text style={{ fontSize: 20 }}>👥</Text>
+          <Text style={[styles.tabLabel, activeTab === 'comunidade' && styles.tabLabelActive]}>
+            Comunidade
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
-          <Text style={[styles.tabIcon, activeTab === 'profile' ? styles.tabIconActive : null]}>👤</Text>
-          <Text style={[styles.tabLabel, activeTab === 'profile' ? styles.tabLabelActive : null]}>Perfil</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('perfil')}>
+          <Text style={{ fontSize: 20 }}>👤</Text>
+          <Text style={[styles.tabLabel, activeTab === 'perfil' && styles.tabLabelActive]}>
+            Perfil
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* MODAL 1: CUPOM */}
-      <Modal visible={showCouponModal} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.couponCard}>
-            <Text style={styles.couponBadge}>
-              {redeemPointsToAdd === 2 ? '🏃 BÔNUS CORRIDA: +2 VISITAS' : '☕ CHECK-IN: +1 VISITA'}
+      {/* MODAL 1: CUPOM DE BENEFÍCIO */}
+      <Modal
+        visible={isPerkModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsPerkModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.perkModalCard}>
+            <Text style={{ fontSize: 36 }}>☕</Text>
+            <Text style={styles.perkModalTitle}>Benefício de Atleta</Text>
+            <Text style={styles.perkModalSubtitle}>
+              Mostre esta tela para o barista no caixa para resgatar.
             </Text>
-            <Text style={styles.couponCafeName}>{redeemingCafe?.name}</Text>
-            
-            <View style={styles.perkHighlightBox}>
-              <Text style={styles.perkHighlightLabel}>Seu Desconto do Dia:</Text>
-              <Text style={styles.perkHighlightValue}>{redeemingCafe?.perk}</Text>
+
+            <View style={styles.timerBox}>
+              <Text style={styles.timerValue}>{perkTimer}s</Text>
+              <Text style={styles.timerLabel}>Tempo restante para validar</Text>
             </View>
 
-            <View style={styles.timerContainer}>
-              <Text style={styles.timerLabel}>Apresente ao barista no balcão:</Text>
-              <Text style={styles.timerValue}>⏱️ {formatTimer(countdown)}</Text>
-              <Text style={styles.timerSub}>Válido apenas enquanto o relógio estiver ativo</Text>
-            </View>
-
-            <TouchableOpacity style={styles.confirmRedeemBtn} onPress={handleCompleteRedemption}>
-              <Text style={styles.confirmRedeemText}>Benefício Aplicado no Caixa ✓</Text>
+            <TouchableOpacity style={styles.closePerkBtn} onPress={() => setIsPerkModalVisible(false)}>
+              <Text style={styles.closePerkBtnText}>Fechar Cupom</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL 2: COROA */}
-      <Modal visible={!!crownVictoryData} animationType="fade" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.victoryCard}>
-            <Text style={styles.victoryIcon}>👑</Text>
-            <Text style={styles.victoryTitle}>NOVO REI COROADO!</Text>
-            <Text style={styles.victoryDesc}>
-              Parabéns, <Text style={{ fontWeight: 'bold' }}>{userProfile.name}</Text>! Você atingiu{' '}
-              <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.newVisits} visitas</Text>, superou{' '}
-              <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.oldKing}</Text> e assumiu o reinado do{' '}
-              <Text style={{ fontWeight: 'bold' }}>{crownVictoryData?.cafeName}</Text>!
+      {/* MODAL 2: NOVO REINADO (TAKEOVER) */}
+      <Modal
+        visible={isTakeoverModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsTakeoverModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.takeoverModalCard}>
+            <Text style={{ fontSize: 50 }}>👑</Text>
+            <Text style={styles.takeoverTitle}>Você é o Novo Rei!</Text>
+            <Text style={styles.takeoverSubtitle}>
+              Parabéns! Você alcançou {newReinadoInfo?.visits} visitas e assumiu o Reinado em{' '}
+              <Text style={{ fontWeight: 'bold', color: '#F59E0B' }}>
+                {newReinadoInfo?.cafeName}
+              </Text>
+              !
             </Text>
-            <TouchableOpacity style={styles.victoryBtn} onPress={() => setCrownVictoryData(null)}>
-              <Text style={styles.victoryBtnText}>Defender Meu Trono 🏆</Text>
+            <TouchableOpacity style={styles.takeoverBtn} onPress={() => setIsTakeoverModalVisible(false)}>
+              <Text style={styles.takeoverBtnText}>Defender o Título! 🏃‍♂️</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL 3: MEDALHA */}
-      <Modal visible={Boolean(unlockedMedal)} animationType="fade" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.medalCard}>
-            <Text style={styles.medalIcon}>🏅</Text>
-            <Text style={styles.medalTitle}>DESAFIO CONCLUÍDO!</Text>
-            <Text style={styles.medalSubtitle}>{unlockedMedal}</Text>
-            <Text style={styles.medalDesc}>
-              Incrível, {userProfile.name}! Você percorreu todas as paradas do circuito, acumulou os quilômetros no seu perfil e faturou esta medalha exclusiva!
-            </Text>
-            <TouchableOpacity style={styles.medalBtn} onPress={() => setUnlockedMedal(null)}>
-              <Text style={styles.medalBtnText}>Colecionar Medalha 🌟</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* MODAL 4: FORMULÁRIO DE INDICAÇÃO */}
-      <Modal visible={showAddCafeModal} animationType="slide" transparent={true}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
-          <View style={styles.formCard}>
-            <View style={styles.formHeader}>
-              <Text style={styles.formTitle}>☕ Indicar Nova Cafeteria</Text>
-              <TouchableOpacity onPress={() => setShowAddCafeModal(false)}>
-                <Text style={styles.closeBtn}>✕</Text>
+      {/* MODAL 3: INDICAR CAFETERIA */}
+      <Modal
+        visible={isNominateModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsNominateModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.nominateCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <Text style={styles.nominateTitle}>➕ Indicar Cafeteria</Text>
+              <TouchableOpacity onPress={() => setIsNominateModalVisible(false)}>
+                <Text style={{ color: '#A8A29E', fontSize: 18 }}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
-              <Text style={styles.formLabel}>Nome da Cafeteria *</Text>
-              <TextInput style={styles.formInput} placeholder="Ex: Kazu Café" placeholderTextColor="#999" value={formName} onChangeText={setFormName} />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Nome da Cafeteria (Ex: Grão Santo)"
+              placeholderTextColor="#78716C"
+              value={nominateName}
+              onChangeText={setNominateName}
+            />
 
-              <Text style={styles.formLabel}>Endereço ou Bairro *</Text>
-              <TextInput style={styles.formInput} placeholder="Ex: R. Dr. Emílio Ribas - Cambuí" placeholderTextColor="#999" value={formAddress} onChangeText={setFormAddress} />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Endereço ou Bairro (Ex: Rua Barreto Leme, Cambuí)"
+              placeholderTextColor="#78716C"
+              value={nominateAddress}
+              onChangeText={setNominateAddress}
+            />
 
-              <Text style={styles.formLabel}>Instagram da Cafeteria</Text>
-              <TextInput style={styles.formInput} placeholder="Ex: @kazucafe" placeholderTextColor="#999" value={formInstagram} onChangeText={setFormInstagram} />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Instagram (Ex: @graosantocafe)"
+              placeholderTextColor="#78716C"
+              value={nominateInstagram}
+              onChangeText={setNominateInstagram}
+            />
 
-              <Text style={styles.formLabel}>Mimo ou Sugestão de Parceria</Text>
-              <TextInput style={styles.formInput} placeholder="Ex: 10% off ou água gelada para corredores" placeholderTextColor="#999" value={formPerk} onChangeText={setFormPerk} />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Sugestão de Benefício (Ex: 10% no espresso)"
+              placeholderTextColor="#78716C"
+              value={nominatePerk}
+              onChangeText={setNominatePerk}
+            />
 
-              <TouchableOpacity style={styles.useGpsBtn} onPress={handleUseCurrentLocationForCafe}>
-                <Text style={styles.useGpsBtnText}>📍 Estou no local (Preencher meu GPS)</Text>
-              </TouchableOpacity>
-
-              <View style={styles.coordsRow}>
-                <View style={{ flex: 1, marginRight: 6 }}>
-                  <Text style={styles.formSmallLabel}>Latitude:</Text>
-                  <TextInput style={styles.formInputSmall} value={formLat} onChangeText={setFormLat} keyboardType="numeric" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 6 }}>
-                  <Text style={styles.formSmallLabel}>Longitude:</Text>
-                  <TextInput style={styles.formInputSmall} value={formLng} onChangeText={setFormLng} keyboardType="numeric" />
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.submitFormBtn} onPress={handleSaveNewCafe}>
-                <Text style={styles.submitFormBtnText}>Salvar Indicação no Mapa ✓</Text>
-              </TouchableOpacity>
-            </ScrollView>
+            <TouchableOpacity style={styles.saveNominationBtn} onPress={handleSaveNomination}>
+              <Text style={styles.saveNominationBtnText}>Cadastrar Indicação</Text>
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-    </View>
+      {/* MODAL 4: NOVA PUBLICAÇÃO NA COMUNIDADE */}
+      <Modal
+        visible={isPostModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsPostModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#1C1917',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 22,
+              maxHeight: '90%',
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FFF' }}>
+                ✍️ Compartilhar com o Club
+              </Text>
+              <TouchableOpacity onPress={() => setIsPostModalVisible(false)}>
+                <Text style={{ color: '#A8A29E', fontSize: 20 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={{
+                backgroundColor: '#292524',
+                color: '#FFF',
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 15,
+                marginBottom: 12,
+              }}
+              placeholder="Qual cafeteria você visitou? (Ex: Café Container)"
+              placeholderTextColor="#78716C"
+              value={postCafe}
+              onChangeText={setPostCafe}
+            />
+
+            <TextInput
+              style={{
+                backgroundColor: '#292524',
+                color: '#FFF',
+                borderRadius: 12,
+                padding: 14,
+                fontSize: 15,
+                height: 100,
+                textAlignVertical: 'top',
+                marginBottom: 14,
+              }}
+              placeholder="Como foi seu treino ou café hoje? (Ex: 5k matinal com espresso no Cambuí 🏃‍♂️☕)"
+              placeholderTextColor="#78716C"
+              multiline
+              value={postText}
+              onChangeText={setPostText}
+            />
+
+            {postPhoto ? (
+              <View style={{ marginBottom: 16, alignItems: 'center' }}>
+                <Image source={{ uri: postPhoto }} style={{ width: '100%', height: 160, borderRadius: 12 }} />
+                <TouchableOpacity onPress={() => setPostPhoto(null)} style={{ marginTop: 8 }}>
+                  <Text style={{ color: '#EF4444', fontSize: 13 }}>Remover foto</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={handlePickPostPhoto}
+                style={{
+                  borderWidth: 1,
+                  borderColor: '#44403C',
+                  borderStyle: 'dashed',
+                  borderRadius: 12,
+                  padding: 14,
+                  alignItems: 'center',
+                  marginBottom: 16,
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 8,
+                }}
+              >
+                <Text style={{ fontSize: 18 }}>📸</Text>
+                <Text style={{ color: '#D6D3D1', fontSize: 14 }}>
+                  Adicionar foto do treino / café
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              onPress={handleCreatePost}
+              style={{
+                backgroundColor: '#D97706',
+                paddingVertical: 14,
+                borderRadius: 14,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 16 }}>
+                Publicar no Feed
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.espresso,
-  },
-  onboardingContainer: {
-    flex: 1,
-    backgroundColor: THEME.espresso,
-    paddingHorizontal: 28,
-    paddingTop: Platform.OS === 'ios' ? 65 : 45,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 25,
-    justifyContent: 'space-between',
-  },
-  onboardingTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  onboardingBrand: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: THEME.amber,
-    letterSpacing: 1.5,
-  },
-  onboardingSkipText: {
-    color: '#A89F91',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  onboardingSlideContent: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  onboardingIconCircle: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: 'rgba(221, 161, 94, 0.12)',
-    borderWidth: 2,
-    borderColor: THEME.amber,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 35,
-    shadowColor: THEME.amber,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-  },
-  onboardingBigIcon: {
-    fontSize: 54,
-  },
-  onboardingSlideTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFF',
-    textAlign: 'center',
-    marginBottom: 16,
-    letterSpacing: 0.5,
-  },
-  onboardingSlideSubtitle: {
-    fontSize: 15,
-    color: '#D4C7B8',
-    textAlign: 'center',
-    lineHeight: 25,
-    paddingHorizontal: 10,
-  },
-  onboardingSignupContent: {
-    alignItems: 'center',
-    width: '100%',
-  },
-  signupBadge: {
-    backgroundColor: 'rgba(200, 90, 50, 0.25)',
-    color: THEME.terracotta,
-    fontSize: 11,
-    fontWeight: 'bold',
-    paddingVertical: 5,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-    letterSpacing: 1,
-  },
-  signupTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFF',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  signupSubtitle: {
-    fontSize: 13,
-    color: '#A89F91',
-    textAlign: 'center',
-    marginBottom: 22,
-    lineHeight: 18,
-  },
-  photoPickerContainer: {
-    marginBottom: 20,
-  },
-  photoPlaceholder: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(221, 161, 94, 0.12)',
-    borderWidth: 2,
-    borderColor: THEME.amber,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoPlaceholderIcon: {
-    fontSize: 28,
-  },
-  photoPlaceholderText: {
-    fontSize: 11,
-    color: THEME.amber,
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  avatarUploadedImg: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 2.5,
-    borderColor: THEME.amber,
-  },
-  signupInput: {
-    width: '100%',
-    backgroundColor: THEME.espressoLight,
-    borderWidth: 1.5,
-    borderColor: 'rgba(221, 161, 94, 0.4)',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#FFF',
-    fontWeight: 'bold',
-    marginBottom: 18,
-    textAlign: 'center',
-  },
-  avatarPickerLabel: {
-    fontSize: 13,
-    color: THEME.amber,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  avatarChoiceBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: THEME.espressoLight,
-    borderWidth: 1.5,
-    borderColor: 'rgba(221, 161, 94, 0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarChoiceSelected: {
-    borderColor: THEME.amber,
-    backgroundColor: 'rgba(221, 161, 94, 0.25)',
-    transform: [{ scale: 1.15 }],
-  },
-  avatarChoiceText: {
-    fontSize: 22,
-  },
-  onboardingFooter: {
-    width: '100%',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 22,
-  },
-  dotPill: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  dotPillActive: {
-    width: 26,
-    backgroundColor: THEME.terracotta,
-  },
-  onboardingNextBtn: {
-    backgroundColor: THEME.terracotta,
-    paddingVertical: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: THEME.terracotta,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  onboardingNextBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+    backgroundColor: '#1C1917',
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 55 : 40,
-    paddingBottom: 16,
-    backgroundColor: THEME.espresso,
-    zIndex: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(221, 161, 94, 0.15)',
-  },
-  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#292524',
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '900',
     color: '#FFF',
-    letterSpacing: 0.8,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: THEME.amber,
+    color: '#A8A29E',
     marginTop: 2,
-    fontWeight: '500',
   },
-  headerAddBtn: {
-    backgroundColor: 'rgba(200, 90, 50, 0.15)',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+  nominateHeaderButton: {
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
     borderWidth: 1,
-    borderColor: THEME.terracotta,
-  },
-  headerAddBtnText: {
-    color: THEME.terracotta,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  tabContentArea: {
-    flex: 1,
-    backgroundColor: THEME.oatCream,
-  },
-  webview: {
-    flex: 1,
-  },
-  gpsButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: '#FFF',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    borderWidth: 1.5,
-    borderColor: THEME.borderLight,
-  },
-  gpsButtonText: {
-    fontSize: 22,
-  },
-  bottomTabBar: {
-    flexDirection: 'row',
-    backgroundColor: THEME.espresso,
-    paddingVertical: 10,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(221, 161, 94, 0.15)',
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-    opacity: 0.5,
-  },
-  tabIconActive: {
-    opacity: 1,
-    transform: [{ scale: 1.1 }],
-  },
-  tabLabel: {
-    fontSize: 11,
-    color: '#8A7D73',
-    fontWeight: '500',
-  },
-  tabLabelActive: {
-    color: THEME.amber,
-    fontWeight: 'bold',
-  },
-  tabScreenScroll: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: THEME.oatCream,
-  },
-  tabSectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginBottom: 4,
-    letterSpacing: 0.3,
-  },
-  tabSectionSubtitle: {
-    fontSize: 13,
-    color: THEME.textMuted,
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  communitySectionTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginBottom: 12,
-    marginTop: 4,
-    letterSpacing: 0.2,
-  },
-  kingsCarousel: {
-    flexDirection: 'row',
-    marginBottom: 22,
-  },
-  kingCarouselCard: {
-    backgroundColor: THEME.cardBg,
+    borderColor: '#D97706',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    padding: 14,
-    alignItems: 'center',
-    marginRight: 12,
-    width: 115,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    position: 'relative',
   },
-  kingCrownBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 8,
-  },
-  kingAvatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FDF7F2',
-    borderWidth: 1.5,
-    borderColor: THEME.amber,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    marginTop: 2,
-  },
-  kingCardName: {
-    fontSize: 13,
+  nominateHeaderButtonText: {
+    color: '#F59E0B',
     fontWeight: 'bold',
-    color: THEME.textDark,
-    textAlign: 'center',
-  },
-  kingCardCafe: {
-    fontSize: 11,
-    color: THEME.terracotta,
-    fontWeight: '600',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  kingCardVisits: {
-    fontSize: 10,
-    color: THEME.textMuted,
-    marginTop: 3,
-  },
-  eventCard: {
-    backgroundColor: THEME.espresso,
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(221, 161, 94, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  eventHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  eventTag: {
-    backgroundColor: THEME.terracotta,
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    letterSpacing: 0.8,
-  },
-  eventDate: {
-    color: THEME.amber,
     fontSize: 12,
-    fontWeight: 'bold',
   },
-  eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 8,
-    letterSpacing: 0.3,
+  mainContent: {
+    flex: 1,
   },
-  eventDesc: {
-    fontSize: 13,
-    color: '#D4C7B8',
-    lineHeight: 20,
-    marginBottom: 16,
+  tabContainer: {
+    flex: 1,
+    backgroundColor: '#1C1917',
   },
-  eventAttendBtn: {
-    backgroundColor: THEME.amber,
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: 'center',
+  filterPillsWrapper: {
+    position: 'absolute',
+    top: 12,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
-  eventAttendingActive: {
-    backgroundColor: THEME.successGreen,
+  filterPillsContainer: {
+    paddingHorizontal: 14,
+    gap: 8,
   },
-  eventAttendBtnText: {
-    color: THEME.espresso,
-    fontWeight: 'bold',
-    fontSize: 13,
-    letterSpacing: 0.3,
-  },
-  eventAttendingActiveText: {
-    color: '#FFF',
-  },
-  feedCard: {
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 16,
+  filterPill: {
+    backgroundColor: '#1C1917',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: '#44403C',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
-  feedCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+  filterPillActive: {
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
-  feedAvatarCircle: {
+  filterPillText: {
+    color: '#D6D3D1',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterPillTextActive: {
+    color: '#FFF',
+    fontWeight: 'bold',
+  },
+  mapWebView: {
+    flex: 1,
+  },
+  centerLocationButton: {
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: '#FFF',
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: THEME.oatCream,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  feedAuthorName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-  },
-  feedActionText: {
-    fontSize: 12,
-    color: THEME.terracotta,
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  feedTimeAgo: {
-    fontSize: 11,
-    color: THEME.textMuted,
-  },
-  feedStatsBox: {
-    backgroundColor: '#F7F3EE',
-    padding: 10,
-    borderRadius: 10,
-    marginVertical: 8,
-  },
-  feedStatsText: {
-    fontSize: 12,
-    color: THEME.textDark,
-    fontWeight: 'bold',
-  },
-  feedCommentText: {
-    fontSize: 13,
-    color: '#4A3E39',
-    fontStyle: 'italic',
-    lineHeight: 20,
-    marginBottom: 10,
-  },
-  feedBadgePill: {
-    backgroundColor: '#E8F5E9',
-    alignSelf: 'flex-start',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
-  feedBadgeText: {
-    fontSize: 11,
-    color: THEME.successGreen,
-    fontWeight: 'bold',
-  },
-  feedFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F0ECE6',
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  cheersButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.oatCream,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  cheersButtonActive: {
-    backgroundColor: '#FFF3CD',
-    borderColor: '#FFEEBA',
-  },
-  cheersIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  cheersText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-  },
-  cheersTextActive: {
-    color: '#856404',
-  },
-  feedCityTag: {
-    fontSize: 11,
-    color: THEME.textMuted,
-  },
-  circuitCard: {
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 18,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
-  circuitCardHeader: {
+  activeRouteCard: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    right: 70,
+    backgroundColor: '#1C1917',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D97706',
+    elevation: 6,
+  },
+  activeRouteTitle: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  activeRouteStats: {
+    color: '#D97706',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  cancelRouteButton: {
+    backgroundColor: '#DC2626',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  cancelRouteButtonText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cafeBottomSheet: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: '#1C1917',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#292524',
+    elevation: 8,
+  },
+  bottomSheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: 10,
   },
-  circuitCardBadge: {
-    fontSize: 11,
-    color: THEME.terracotta,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  circuitCardTitle: {
+  bottomSheetTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: THEME.textDark,
+    color: '#FFF',
+  },
+  bottomSheetAddress: {
+    fontSize: 12,
+    color: '#A8A29E',
     marginTop: 2,
   },
-  distanceBadge: {
-    backgroundColor: '#FDF7F2',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: THEME.terracotta,
-  },
-  distanceBadgeText: {
-    fontSize: 12,
-    color: THEME.terracotta,
-    fontWeight: 'bold',
-  },
-  circuitCardDesc: {
-    fontSize: 13,
-    color: THEME.textMuted,
-    marginVertical: 12,
-    lineHeight: 20,
-  },
-  circuitCardStopsBox: {
-    backgroundColor: THEME.oatCream,
-    padding: 12,
+  reinadoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(217, 119, 6, 0.1)',
     borderRadius: 12,
-    marginBottom: 16,
+    padding: 10,
+    gap: 10,
+    marginBottom: 8,
   },
-  circuitCardStopsTitle: {
-    fontSize: 12,
+  reinadoKingName: {
+    color: '#FFF',
+    fontSize: 13,
     fontWeight: 'bold',
-    color: THEME.textDark,
+  },
+  reinadoVisits: {
+    color: '#A8A29E',
+    fontSize: 11,
+  },
+  perkBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#292524',
+    borderRadius: 12,
+    padding: 10,
+    gap: 10,
+    marginBottom: 14,
+  },
+  perkText: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
+  },
+  bottomSheetActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionBtnText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  routeBtn: {
+    backgroundColor: '#EA580C',
+  },
+  checkInBtn: {
+    backgroundColor: '#059669',
+  },
+  perkBtn: {
+    backgroundColor: '#D97706',
+  },
+  sectionHeading: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
     marginBottom: 6,
   },
-  circuitCardStopText: {
+  sectionSubheading: {
+    fontSize: 13,
+    color: '#A8A29E',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  circuitCard: {
+    backgroundColor: '#292524',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  circuitTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  circuitPill: {
+    backgroundColor: 'rgba(234, 88, 12, 0.2)',
+    color: '#EA580C',
     fontSize: 12,
-    color: THEME.textMuted,
-    lineHeight: 20,
+    fontWeight: 'bold',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  circuitDesc: {
+    fontSize: 13,
+    color: '#A8A29E',
+    marginVertical: 8,
+  },
+  checkpointContainer: {
+    marginVertical: 6,
+    gap: 4,
+  },
+  checkpointItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circuitRewardBox: {
+    backgroundColor: 'rgba(217, 119, 6, 0.15)',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 10,
+    marginBottom: 12,
   },
   startCircuitBtn: {
-    backgroundColor: THEME.terracotta,
-    paddingVertical: 13,
-    borderRadius: 14,
+    backgroundColor: '#D97706',
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
-    shadowColor: THEME.terracotta,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
   },
   startCircuitBtnText: {
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 14,
   },
-  profileHeaderCard: {
-    backgroundColor: THEME.cardBg,
-    borderRadius: 24,
-    padding: 22,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-    marginBottom: 20,
+  clubEventCard: {
+    backgroundColor: '#292524',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: '#44403C',
   },
-  avatarCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: THEME.espresso,
-    borderWidth: 3,
-    borderColor: THEME.amber,
+  clubEventTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  clubEventSubtitle: {
+    fontSize: 12,
+    color: '#F59E0B',
+    marginTop: 2,
+  },
+  clubEventDesc: {
+    fontSize: 13,
+    color: '#A8A29E',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  clubEventButton: {
+    backgroundColor: '#D97706',
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  clubEventButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  postActionButton: {
+    backgroundColor: '#D97706',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 13,
+    borderRadius: 25,
+    marginBottom: 16,
+    gap: 8,
+    elevation: 4,
+  },
+  postActionButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  postCard: {
+    backgroundColor: '#292524',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  postAuthor: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  postTime: {
+    fontSize: 12,
+    color: '#78716C',
+  },
+  postText: {
+    fontSize: 14,
+    color: '#E7E5E4',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  postImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  postFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#3C3836',
+    paddingTop: 10,
+  },
+  cheerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#1C1917',
+  },
+  cheerButtonActive: {
+    backgroundColor: 'rgba(217, 119, 6, 0.2)',
+  },
+  cheerButtonText: {
+    color: '#A8A29E',
+    fontSize: 13,
+  },
+  profileHeaderCard: {
+    alignItems: 'center',
+    backgroundColor: '#292524',
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 16,
+  },
+  profileAvatarBox: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#1C1917',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
-    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#D97706',
   },
-  avatarProfileImg: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
-  editPhotoBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FFF',
-    padding: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: THEME.amber,
-  },
-  avatarText: {
-    fontSize: 34,
-  },
-  profileBigName: {
-    fontSize: 22,
+  profileName: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: THEME.textDark,
-  },
-  profileRoleText: {
-    fontSize: 13,
-    color: THEME.terracotta,
-    fontWeight: '600',
-    marginTop: 2,
-    marginBottom: 18,
-  },
-  profileStatsGrid: {
-    flexDirection: 'row',
-    width: '100%',
-    borderTopWidth: 1,
-    borderTopColor: '#F0ECE6',
-    paddingTop: 16,
-  },
-  profileGridItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  profileGridVal: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-  },
-  profileGridLabel: {
-    fontSize: 11,
-    color: THEME.textMuted,
-    marginTop: 2,
-  },
-  profileSection: {
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  profileSectionTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginBottom: 14,
-    letterSpacing: 0.2,
-  },
-  medalsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  medalPill: {
-    backgroundColor: '#FDF7F2',
-    borderWidth: 1,
-    borderColor: THEME.amber,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-  },
-  medalPillText: {
-    fontSize: 12,
-    color: THEME.textDark,
-    fontWeight: 'bold',
-  },
-  kingCafeCard: {
-    backgroundColor: '#FFF9DB',
-    borderWidth: 1,
-    borderColor: '#FFE066',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-  },
-  kingCafeTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#856404',
-  },
-  kingCafeDesc: {
-    fontSize: 12,
-    color: '#664D03',
-    marginTop: 3,
-  },
-  noKingsText: {
-    fontSize: 12,
-    color: THEME.textMuted,
-    fontStyle: 'italic',
-  },
-  seeOnboardingBtn: {
-    backgroundColor: THEME.cardBg,
-    borderWidth: 1.5,
-    borderColor: THEME.borderLight,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  seeOnboardingBtnText: {
-    color: THEME.textDark,
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  resetBtn: {
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  resetBtnText: {
-    fontSize: 12,
-    color: '#ADB5BD',
-    textDecorationLine: 'underline',
-  },
-  circuitSheet: {
-    position: 'absolute',
-    bottom: 25,
-    left: 16,
-    right: 16,
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 1.5,
-    borderColor: THEME.amber,
-  },
-  circuitBadgeLabel: {
-    fontSize: 11,
-    color: THEME.terracotta,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
-  },
-  circuitProgressText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  stopsList: {
-    gap: 4,
-    marginVertical: 6,
-  },
-  stopItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 3,
-  },
-  stopIcon: {
-    fontSize: 14,
-    marginRight: 8,
-  },
-  stopName: {
-    fontSize: 13,
-    color: THEME.textDark,
-    fontWeight: '500',
-  },
-  stopNameChecked: {
-    textDecorationLine: 'line-through',
-    color: THEME.successGreen,
-    fontWeight: 'bold',
-  },
-  simulateStopBtn: {
-    marginTop: 12,
-    backgroundColor: THEME.espresso,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  simulateStopBtnText: {
     color: '#FFF',
-    fontWeight: 'bold',
+  },
+  profileLocation: {
     fontSize: 13,
-  },
-  circuitDoneBox: {
-    marginTop: 10,
-    backgroundColor: '#D4EDDA',
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  circuitDoneText: {
-    color: '#155724',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  circuitDoneSubText: {
-    color: THEME.successGreen,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  activeRouteSheet: {
-    position: 'absolute',
-    bottom: 25,
-    left: 16,
-    right: 16,
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 1.5,
-    borderColor: THEME.terracotta,
-  },
-  routeHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  routeTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: THEME.terracotta,
-    textTransform: 'uppercase',
-  },
-  routeDest: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginTop: 2,
-  },
-  cancelBtn: {
-    backgroundColor: '#F8D7DA',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  cancelBtnText: {
-    color: '#721C24',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  vehicleAlertBox: {
-    backgroundColor: '#FFF3CD',
-    padding: 8,
-    borderRadius: 10,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#FFEEBA',
-  },
-  vehicleAlertText: {
-    color: '#856404',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 16,
+    color: '#A8A29E',
+    marginTop: 4,
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
+    gap: 10,
+    marginBottom: 20,
   },
   statBox: {
     flex: 1,
-    backgroundColor: THEME.oatCream,
-    padding: 10,
-    borderRadius: 12,
+    backgroundColor: '#292524',
+    borderRadius: 14,
+    padding: 14,
     alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 10,
-    color: THEME.textMuted,
   },
   statValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginTop: 2,
-  },
-  simulationRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  simulateWalkBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  simulateWalkText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: THEME.successGreen,
-  },
-  simulateCarBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  simulateCarText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#C62828',
-  },
-  checkinButton: {
-    marginTop: 14,
-    backgroundColor: THEME.successGreen,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  checkinButtonText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: 'bold',
-  },
-  bottomSheet: {
-    position: 'absolute',
-    bottom: 25,
-    left: 16,
-    right: 16,
-    backgroundColor: THEME.cardBg,
-    borderRadius: 22,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cafeTitle: {
-    fontSize: 19,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-  },
-  cafeAddress: {
-    fontSize: 12,
-    color: THEME.textMuted,
-    marginTop: 3,
-  },
-  cafeInstagram: {
-    fontSize: 11,
-    color: THEME.terracotta,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  closeBtn: {
     fontSize: 18,
-    color: '#999',
     fontWeight: 'bold',
-    padding: 4,
+    color: '#F59E0B',
   },
-  badgesContainer: {
-    marginVertical: 12,
-    gap: 6,
+  statLabel: {
+    fontSize: 11,
+    color: '#A8A29E',
+    marginTop: 4,
   },
-  kingBadge: {
-    backgroundColor: '#FFF3CD',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-  },
-  myKingBadge: {
-    backgroundColor: '#D4EDDA',
-  },
-  kingText: {
-    color: '#856404',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  perkBadge: {
-    backgroundColor: '#F7F3EE',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  perkText: {
-    color: THEME.textDark,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  modalitiesContainer: {
-    marginTop: 8,
+  medalsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
+    marginTop: 8,
   },
-  btnRoute: {
-    backgroundColor: THEME.terracotta,
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: 'center',
-    shadowColor: THEME.terracotta,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
+  medalPill: {
+    backgroundColor: '#292524',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#44403C',
   },
-  btnText: {
+  medalPillText: {
     color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
   },
-  btnPitStop: {
-    backgroundColor: THEME.oatCream,
-    borderWidth: 1.5,
-    borderColor: THEME.borderLight,
-    paddingVertical: 12,
-    borderRadius: 14,
-    alignItems: 'center',
+  bottomTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#1C1917',
+    borderTopWidth: 1,
+    borderTopColor: '#292524',
+    paddingVertical: 8,
   },
-  btnPitStopText: {
-    color: THEME.textDark,
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  modalOverlay: {
+  tabButton: {
     flex: 1,
-    backgroundColor: 'rgba(28, 20, 18, 0.75)',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabLabel: {
+    fontSize: 11,
+    color: '#78716C',
+    marginTop: 3,
+    fontWeight: '600',
+  },
+  tabLabelActive: {
+    color: '#F59E0B',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
     padding: 20,
   },
-  couponCard: {
-    width: '100%',
-    backgroundColor: '#FFF',
+  perkModalCard: {
+    backgroundColor: '#1C1917',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#D97706',
   },
-  couponBadge: {
-    backgroundColor: THEME.terracotta,
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 11,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    letterSpacing: 0.8,
-  },
-  couponCafeName: {
+  perkModalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: THEME.textDark,
-    marginTop: 12,
-    textAlign: 'center',
+    color: '#FFF',
+    marginTop: 10,
   },
-  perkHighlightBox: {
-    backgroundColor: '#FDF7F2',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: THEME.terracotta,
-    padding: 16,
+  perkModalSubtitle: {
+    fontSize: 13,
+    color: '#A8A29E',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  timerBox: {
+    backgroundColor: '#292524',
     borderRadius: 16,
-    width: '100%',
-    marginVertical: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
     alignItems: 'center',
+    marginVertical: 16,
   },
-  perkHighlightLabel: {
-    fontSize: 12,
-    color: THEME.terracotta,
+  timerValue: {
+    fontSize: 40,
     fontWeight: 'bold',
-  },
-  perkHighlightValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: THEME.textDark,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+    color: '#EF4444',
   },
   timerLabel: {
     fontSize: 12,
-    color: THEME.textMuted,
-  },
-  timerValue: {
-    fontSize: 34,
-    fontWeight: 'bold',
-    color: '#DC3545',
-    letterSpacing: 2,
-    marginVertical: 4,
-  },
-  timerSub: {
-    fontSize: 11,
-    color: '#ADB5BD',
-  },
-  confirmRedeemBtn: {
-    backgroundColor: THEME.espresso,
-    width: '100%',
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  confirmRedeemText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  victoryCard: {
-    width: '100%',
-    backgroundColor: THEME.espresso,
-    borderRadius: 24,
-    padding: 26,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: THEME.amber,
-  },
-  victoryIcon: {
-    fontSize: 55,
-    marginBottom: 10,
-  },
-  victoryTitle: {
-    color: THEME.amber,
-    fontSize: 22,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  victoryDesc: {
-    color: '#FFF',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginVertical: 18,
-  },
-  victoryBtn: {
-    backgroundColor: THEME.amber,
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  victoryBtnText: {
-    color: THEME.espresso,
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  medalCard: {
-    width: '100%',
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 26,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: THEME.amber,
-  },
-  medalIcon: {
-    fontSize: 60,
-    marginBottom: 8,
-  },
-  medalTitle: {
-    color: THEME.terracotta,
-    fontSize: 20,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  medalSubtitle: {
-    color: THEME.textDark,
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#78716C',
     marginTop: 4,
-    marginBottom: 12,
   },
-  medalDesc: {
-    color: THEME.textMuted,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  medalBtn: {
-    backgroundColor: THEME.terracotta,
-    width: '100%',
-    paddingVertical: 14,
+  closePerkBtn: {
+    backgroundColor: '#292524',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 14,
-    alignItems: 'center',
   },
-  medalBtnText: {
-    color: '#FFF',
+  closePerkBtnText: {
+    color: '#A8A29E',
     fontWeight: 'bold',
+  },
+  takeoverModalCard: {
+    backgroundColor: '#1C1917',
+    borderRadius: 24,
+    padding: 26,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+  },
+  takeoverTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#F59E0B',
+    marginTop: 10,
+  },
+  takeoverSubtitle: {
+    fontSize: 14,
+    color: '#E7E5E4',
+    textAlign: 'center',
+    marginVertical: 14,
+    lineHeight: 22,
+  },
+  takeoverBtn: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  takeoverBtnText: {
+    color: '#000',
+    fontWeight: '900',
     fontSize: 15,
   },
-  formCard: {
-    width: '100%',
-    maxHeight: '90%',
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 18,
-    elevation: 12,
+  nominateCard: {
+    backgroundColor: '#1C1917',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#44403C',
   },
-  formHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-    paddingBottom: 10,
-  },
-  formTitle: {
+  nominateTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: THEME.textDark,
+    color: '#FFF',
   },
-  formLabel: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#495057',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  formSmallLabel: {
-    fontSize: 11,
-    color: THEME.textMuted,
-    marginBottom: 2,
-  },
-  formInput: {
-    backgroundColor: THEME.oatCream,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
+  modalInput: {
+    backgroundColor: '#292524',
+    color: '#FFF',
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    padding: 13,
     fontSize: 14,
-    color: THEME.textDark,
-  },
-  coordsRow: {
-    flexDirection: 'row',
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  formInputSmall: {
-    backgroundColor: THEME.oatCream,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 12,
-    color: THEME.textDark,
-  },
-  useGpsBtn: {
-    backgroundColor: THEME.oatCream,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  useGpsBtnText: {
-    color: THEME.textDark,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  submitFormBtn: {
-    backgroundColor: THEME.terracotta,
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginTop: 10,
     marginBottom: 10,
   },
-  submitFormBtnText: {
+  saveNominationBtn: {
+    backgroundColor: '#D97706',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  saveNominationBtnText: {
     color: '#FFF',
     fontWeight: 'bold',
     fontSize: 15,
