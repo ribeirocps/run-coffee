@@ -7,6 +7,7 @@ export interface Cafe {
   neighborhood: string;
   currentKing: string;
   kingVisits: number;
+  kingAvatar?: string;
   perk: string;
   distanceKm: number;
   isPartner: boolean;
@@ -27,6 +28,7 @@ export interface CommunityPost {
   id: string;
   userName: string;
   avatar: string;
+  avatarUrl?: string;
   timeAgo: string;
   cafeName: string;
   text: string;

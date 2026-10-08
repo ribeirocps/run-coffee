@@ -1,5 +1,8 @@
+import { Feather, Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Circuit } from '../types';
+import { calculateUserLevel } from '../utils/levels';
 
 interface ProfileTabProps {
   userName: string;
@@ -8,6 +11,7 @@ interface ProfileTabProps {
   userVisits: number;
   userCrowns: number;
   userMedals: string[];
+  circuits?: Circuit[];
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({
@@ -17,50 +21,92 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   userVisits,
   userCrowns,
   userMedals,
+  circuits = [],
 }) => {
+  const completedCircuitsCount = circuits.filter((c) => c.completed).length;
+  const levelInfo = calculateUserLevel(userVisits, userCrowns, completedCircuitsCount);
+
   return (
-    <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      {/* CARD DO PERFIL DO ATLETA */}
       <View style={styles.profileHeaderCard}>
-        <View style={styles.profileAvatarBox}>
-          <Text style={{ fontSize: 44 }}>{userAvatar}</Text>
+        <View style={styles.avatarWrapper}>
+          <View style={[styles.profileAvatarBox, { borderColor: levelInfo.badgeColor }]}>
+            <Text style={{ fontSize: 40 }}>{userAvatar}</Text>
+          </View>
+          <View style={[styles.levelMiniBadge, { backgroundColor: levelInfo.badgeColor }]}>
+            <Text style={styles.levelMiniBadgeText}>NV.{levelInfo.levelNumber}</Text>
+          </View>
         </View>
+
         <Text style={styles.profileName}>{userName}</Text>
-        <Text style={styles.profileLocation}>Campinas / SP • Nível 1 Club</Text>
+        <Text style={styles.profileLocation}>Campinas / SP • Club Urbano</Text>
+
+        {/* BADGE DE NÍVEL / STATUS (COFFEE LOVER) */}
+        <View style={[styles.levelPill, { borderColor: levelInfo.badgeColor }]}>
+          <Ionicons
+            name={levelInfo.levelNumber === 4 ? 'ribbon' : levelInfo.levelNumber === 3 ? 'trophy' : 'compass'}
+            size={14}
+            color={levelInfo.badgeColor}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.levelPillText, { color: levelInfo.badgeColor }]}>
+            {levelInfo.title}
+          </Text>
+        </View>
+
+        {/* BARRA DE PROGRESSO DO NÍVEL (ESTILO STRAVA) */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressBar,
+                { width: `${levelInfo.progressPercent}%`, backgroundColor: levelInfo.badgeColor },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressMilestoneText}>{levelInfo.nextMilestone}</Text>
+        </View>
       </View>
 
+      {/* MÉTRICAS EM NÚMEROS DE IMPACTO */}
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>{userKm} km</Text>
+          <Text style={styles.statValue}>{userKm}</Text>
+          <Text style={styles.statUnit}>KM</Text>
           <Text style={styles.statLabel}>Distância</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statValue}>{userVisits}</Text>
-          <Text style={styles.statLabel}>Visitas</Text>
+          <Text style={styles.statUnit}>CHECK-INS</Text>
+          <Text style={styles.statLabel}>Cafeterias</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={styles.statValue}>{userCrowns}</Text>
-          <Text style={styles.statLabel}>Reinados 👑</Text>
+          <Text style={[styles.statValue, { color: '#F59E0B' }]}>{userCrowns}</Text>
+          <Text style={styles.statUnit}>REINADOS</Text>
+          <Text style={styles.statLabel}>Títulos</Text>
         </View>
       </View>
 
-      {/* Conquistas e Medalhas */}
-      <Text style={styles.sectionHeading}>🏅 Medalhas & Conquistas</Text>
+      {/* ESTANTE DE MEDALHAS & CONQUISTAS */}
+      <Text style={styles.sectionHeading}>MEDALHAS E CONQUISTAS</Text>
       <View style={styles.medalsContainer}>
         {userMedals.map((m, idx) => (
-          <View key={idx} style={[styles.medalPill, { borderColor: '#D97706' }]}>
-            <Text style={[styles.medalPillText, { color: '#F59E0B', fontWeight: 'bold' }]}>
-              {m}
-            </Text>
+          <View key={idx} style={styles.medalPillActive}>
+            <Feather name="award" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
+            <Text style={styles.medalPillTextActive}>{m}</Text>
           </View>
         ))}
         {!userMedals.includes('🏅 Medalha Centro Histórico') && (
-          <View style={[styles.medalPill, { opacity: 0.4 }]}>
-            <Text style={styles.medalPillText}>🔒 Circuito Centro</Text>
+          <View style={styles.medalPillLocked}>
+            <Feather name="lock" size={13} color="#52525B" style={{ marginRight: 6 }} />
+            <Text style={styles.medalPillTextLocked}>Circuito Centro</Text>
           </View>
         )}
         {!userMedals.includes('👑 Coroa do Cambuí') && (
-          <View style={[styles.medalPill, { opacity: 0.4 }]}>
-            <Text style={styles.medalPillText}>🔒 Circuito Cambuí</Text>
+          <View style={styles.medalPillLocked}>
+            <Feather name="lock" size={13} color="#52525B" style={{ marginRight: 6 }} />
+            <Text style={styles.medalPillTextLocked}>Circuito Cambuí</Text>
           </View>
         )}
       </View>
@@ -71,31 +117,44 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 const styles = StyleSheet.create({
   tabContainer: {
     flex: 1,
-    backgroundColor: '#1C1917',
-  },
-  sectionHeading: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 6,
+    backgroundColor: '#0D0D0D',
   },
   profileHeaderCard: {
     alignItems: 'center',
-    backgroundColor: '#292524',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: '#18181B',
+    borderRadius: 22,
+    padding: 22,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 12,
   },
   profileAvatarBox: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#1C1917',
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: '#27272A',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    borderWidth: 3,
+  },
+  levelMiniBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#D97706',
+    borderColor: '#18181B',
+  },
+  levelMiniBadgeText: {
+    color: '#0D0D0D',
+    fontSize: 9,
+    fontWeight: '900',
   },
   profileName: {
     fontSize: 20,
@@ -103,9 +162,48 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   profileLocation: {
-    fontSize: 13,
-    color: '#A8A29E',
-    marginTop: 4,
+    fontSize: 12,
+    color: '#71717A',
+    marginTop: 2,
+  },
+  levelPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  levelPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  progressContainer: {
+    width: '100%',
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#27272A',
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: '#27272A',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressMilestoneText: {
+    fontSize: 11,
+    color: '#A1A1AA',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   statsRow: {
     flexDirection: 'row',
@@ -114,37 +212,71 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#292524',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#27272A',
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#F59E0B',
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#FFF',
+  },
+  statUnit: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FC4C02',
+    letterSpacing: 0.5,
+    marginTop: 1,
   },
   statLabel: {
     fontSize: 11,
-    color: '#A8A29E',
+    color: '#71717A',
     marginTop: 4,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#71717A',
+    letterSpacing: 1.2,
+    marginBottom: 12,
   },
   medalsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 8,
   },
-  medalPill: {
-    backgroundColor: '#292524',
+  medalPillActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18181B',
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#44403C',
+    borderColor: '#D97706',
   },
-  medalPillText: {
-    color: '#FFF',
-    fontSize: 13,
+  medalPillTextActive: {
+    color: '#F59E0B',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  medalPillLocked: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#18181B',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    opacity: 0.6,
+  },
+  medalPillTextLocked: {
+    color: '#71717A',
+    fontSize: 12,
   },
 });

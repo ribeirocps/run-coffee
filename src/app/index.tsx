@@ -1,3 +1,4 @@
+import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -10,22 +11,20 @@ import {
   Modal,
   Platform,
   SafeAreaView,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// Importações dos novos módulos criados
+// Módulos organizados
 import {
   INITIAL_CAFES,
   INITIAL_CIRCUITS,
   INITIAL_POSTS,
-  NEIGHBORHOOD_CENTERS,
   STORAGE_CIRCUITS_KEY,
   STORAGE_POSTS_KEY,
   STORAGE_PROFILE_KEY,
@@ -50,7 +49,6 @@ export default function RunCoffeeApp() {
 
   // Cafés e Localização
   const [cafes, setCafes] = useState<Cafe[]>(INITIAL_CAFES);
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState('Todos');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedCafe, setSelectedCafe] = useState<Cafe | null>(null);
   const [activeRoute, setActiveRoute] = useState<{ cafe: Cafe; distanceKm: number; durationMin: number } | null>(null);
@@ -73,7 +71,6 @@ export default function RunCoffeeApp() {
   // Circuitos e Comunidade
   const [circuits, setCircuits] = useState<Circuit[]>(INITIAL_CIRCUITS);
   const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
-  const [isRunClubJoined, setIsRunClubJoined] = useState(false);
 
   // Postar no Feed
   const [isPostModalVisible, setIsPostModalVisible] = useState(false);
@@ -94,9 +91,7 @@ export default function RunCoffeeApp() {
         }
 
         const storedCircuits = await AsyncStorage.getItem(STORAGE_CIRCUITS_KEY);
-        if (storedCircuits) {
-          setCircuits(JSON.parse(storedCircuits));
-        }
+        if (storedCircuits) setCircuits(JSON.parse(storedCircuits));
 
         const storedProfile = await AsyncStorage.getItem(STORAGE_PROFILE_KEY);
         if (storedProfile) {
@@ -106,13 +101,10 @@ export default function RunCoffeeApp() {
           if (prof.crowns !== undefined) setUserCrowns(prof.crowns);
           if (prof.medals) setUserMedals(prof.medals);
         }
-      } catch (e) {
-        console.log('Erro ao carregar dados locais:', e);
-      }
+      } catch (e) {}
     })();
   }, []);
 
-  // Salvar Dados
   const saveProfileData = async (visits: number, km: number, crowns: number, medals: string[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify({ visits, km, crowns, medals }));
@@ -160,29 +152,21 @@ export default function RunCoffeeApp() {
     return () => clearInterval(interval);
   }, [isPerkModalVisible, perkTimer]);
 
-  // Filtragem de Cafeterias por Bairro
-  const filteredCafes =
-    selectedNeighborhood === 'Todos'
-      ? cafes
-      : cafes.filter(
-          (c) =>
-            (c.neighborhood && c.neighborhood.toLowerCase() === selectedNeighborhood.toLowerCase()) ||
-            c.address.toLowerCase().includes(selectedNeighborhood.toLowerCase())
-        );
-
-  const handleSelectNeighborhood = (bairro: string) => {
-    setSelectedNeighborhood(bairro);
-    setSelectedCafe(null);
-    const target = NEIGHBORHOOD_CENTERS[bairro] || NEIGHBORHOOD_CENTERS.Todos;
-    webViewRef.current?.injectJavaScript(`
-      if (window.centerMapWithZoom) {
-        window.centerMapWithZoom(${target.lat}, ${target.lng}, ${target.zoom});
-      }
-      true;
-    `);
+  // Ação ao Tocar no Botão Central do Mapa
+  const handleCenterMapButton = () => {
+    if (activeTab !== 'mapa') {
+      setActiveTab('mapa');
+    } else if (userLocation) {
+      webViewRef.current?.injectJavaScript(`
+        if (window.centerMap) {
+          window.centerMap(${userLocation.lat}, ${userLocation.lng});
+        }
+        true;
+      `);
+    }
   };
 
-  // Check-in com Geofence e Anti-trapaça
+  // Check-in com Geofence de 150m
   const handleCheckInAttempt = async (cafe: Cafe) => {
     let distanceMeters = 0;
     if (userLocation) {
@@ -321,13 +305,13 @@ export default function RunCoffeeApp() {
       setTimeout(() => {
         Alert.alert(
           '🏆 Circuito Concluído!',
-          `Incrível! Você visitou todas as cafeterias do circuito e conquistou: ${unlockedMedal}! A medalha já está brilhando no seu Perfil!`
+          `Incrível! Você visitou todas as cafeterias do circuito e conquistou: ${unlockedMedal}! A medalha já está no seu Perfil!`
         );
       }, 800);
     }
   };
 
-  // Rota Pedestre via OSRM Foot API
+  // Rota Pedestre
   const handleStartRoute = async (cafe: Cafe) => {
     if (!userLocation) {
       Alert.alert('GPS não disponível', 'Aguardando sinal de satélite.');
@@ -459,7 +443,7 @@ export default function RunCoffeeApp() {
     Alert.alert('Café Indicado! ☕', 'Sua indicação foi adicionada ao mapa para validação do Club.');
   };
 
-  // Leaflet HTML com Google Maps Oficial e Marcadores
+  // Leaflet HTML
   const leafletHTML = `
     <!DOCTYPE html>
     <html>
@@ -479,7 +463,7 @@ export default function RunCoffeeApp() {
             font-weight: 700;
             color: #1C1917;
             box-shadow: 0 4px 14px rgba(0,0,0,0.22);
-            border: 2px solid #EA580C;
+            border: 2px solid #FC4C02;
             display: flex;
             align-items: center;
             gap: 4px;
@@ -497,7 +481,7 @@ export default function RunCoffeeApp() {
             width: 0; height: 0;
             border-left: 6px solid transparent;
             border-right: 6px solid transparent;
-            border-top: 6px solid #EA580C;
+            border-top: 6px solid #FC4C02;
           }
           .cafe-pill.king .cafe-pill-tip {
             border-top-color: #D97706;
@@ -505,10 +489,10 @@ export default function RunCoffeeApp() {
           .pulse-marker {
             width: 18px;
             height: 18px;
-            background: #EA580C;
+            background: #FC4C02;
             border: 3px solid white;
             border-radius: 50%;
-            box-shadow: 0 0 12px rgba(234, 88, 12, 0.7);
+            box-shadow: 0 0 12px rgba(252, 76, 2, 0.7);
             position: relative;
           }
           .pulse-marker::after {
@@ -519,7 +503,7 @@ export default function RunCoffeeApp() {
             width: 30px;
             height: 30px;
             border-radius: 50%;
-            background: rgba(234, 88, 12, 0.35);
+            background: rgba(252, 76, 2, 0.35);
             animation: radar 2s infinite ease-out;
           }
           @keyframes radar {
@@ -548,7 +532,7 @@ export default function RunCoffeeApp() {
           });
           L.marker(center, { icon: userIcon }).addTo(map);
 
-          var cafesData = ${JSON.stringify(filteredCafes)};
+          var cafesData = ${JSON.stringify(cafes)};
           cafesData.forEach(function(cafe) {
             var isKing = cafe.currentKing && cafe.currentKing !== 'Disputa Aberta';
             var crownBadge = isKing ? ' 👑' : '';
@@ -573,7 +557,7 @@ export default function RunCoffeeApp() {
           var currentRouteLine = null;
           window.drawRoute = function(latLngArray) {
             if (currentRouteLine) { map.removeLayer(currentRouteLine); }
-            currentRouteLine = L.polyline(latLngArray, { color: '#EA580C', weight: 6, opacity: 0.85, lineJoin: 'round' }).addTo(map);
+            currentRouteLine = L.polyline(latLngArray, { color: '#FC4C02', weight: 6, opacity: 0.85, lineJoin: 'round' }).addTo(map);
             map.fitBounds(currentRouteLine.getBounds(), { padding: [50, 50] });
           };
           window.clearRoute = function() {
@@ -582,9 +566,6 @@ export default function RunCoffeeApp() {
           window.centerMap = function(lat, lng) {
             map.setView([lat, lng], 16, { animate: true });
           };
-          window.centerMapWithZoom = function(lat, lng, zoom) {
-            map.setView([lat, lng], zoom, { animate: true });
-          };
         </script>
       </body>
     </html>
@@ -592,57 +573,13 @@ export default function RunCoffeeApp() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1C1917" />
+      <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
 
-      {/* Cabeçalho */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>RunCoffee</Text>
-          <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano ☕</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.nominateHeaderButton}
-          onPress={() => setIsNominateModalVisible(true)}
-        >
-          <Text style={styles.nominateHeaderButtonText}>+ Indicar Café</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Conteúdo Principal por Abas */}
+      {/* Conteúdo Principal (Tela Cheia) */}
       <View style={styles.mainContent}>
-        {/* ABA 1: MAPA */}
         {activeTab === 'mapa' && (
           <View style={styles.tabContainer}>
-            <View style={styles.filterPillsWrapper}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterPillsContainer}
-              >
-                {['Todos', 'Cambuí', 'Centro', 'Bosque', 'Barão Geraldo'].map((bairro) => (
-                  <TouchableOpacity
-                    key={bairro}
-                    style={[
-                      styles.filterPill,
-                      selectedNeighborhood === bairro && styles.filterPillActive,
-                    ]}
-                    onPress={() => handleSelectNeighborhood(bairro)}
-                  >
-                    <Text
-                      style={[
-                        styles.filterPillText,
-                        selectedNeighborhood === bairro && styles.filterPillTextActive,
-                      ]}
-                    >
-                      {bairro}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
             <WebView
-              key={selectedNeighborhood}
               ref={webViewRef}
               originWhitelist={['*']}
               source={{ html: leafletHTML }}
@@ -658,6 +595,7 @@ export default function RunCoffeeApp() {
               }}
             />
 
+            {/* Centralizar GPS */}
             <TouchableOpacity
               style={styles.centerLocationButton}
               onPress={() => {
@@ -671,13 +609,14 @@ export default function RunCoffeeApp() {
                 }
               }}
             >
-              <Text style={{ fontSize: 20 }}>🎯</Text>
+              <Ionicons name="locate" size={22} color="#0D0D0D" />
             </TouchableOpacity>
 
+            {/* Card de Rota Ativa */}
             {activeRoute && (
               <View style={styles.activeRouteCard}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.activeRouteTitle}>🚶 Rumo a {activeRoute.cafe.name}</Text>
+                  <Text style={styles.activeRouteTitle}>Rumo a {activeRoute.cafe.name}</Text>
                   <Text style={styles.activeRouteStats}>
                     {activeRoute.distanceKm} km • ~{activeRoute.durationMin} min a pé
                   </Text>
@@ -688,35 +627,71 @@ export default function RunCoffeeApp() {
               </View>
             )}
 
+            {/* ========================================================= */}
+            {/* NOVO BOTTOMSHEET DA CAFETERIA (ESTILO STRAVA DARK MODE) */}
+            {/* ========================================================= */}
             {selectedCafe && !activeRoute && (
               <View style={styles.cafeBottomSheet}>
+                {/* Alça de Arraste (Drag Handle) */}
+                <View style={styles.bottomSheetHandle} />
+
+                {/* Cabeçalho do Café */}
                 <View style={styles.bottomSheetHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.bottomSheetTitle}>{selectedCafe.name}</Text>
-                    <Text style={styles.bottomSheetAddress}>{selectedCafe.address}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <Text style={styles.bottomSheetTitle}>{selectedCafe.name}</Text>
+                      <View style={styles.neighborhoodBadge}>
+                        <Text style={styles.neighborhoodBadgeText}>{selectedCafe.neighborhood}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Feather name="map-pin" size={12} color="#71717A" />
+                      <Text style={styles.bottomSheetAddress}>{selectedCafe.address}</Text>
+                    </View>
                   </View>
-                  <TouchableOpacity onPress={() => setSelectedCafe(null)}>
-                    <Text style={{ color: '#A8A29E', fontSize: 18 }}>✕</Text>
+                  <TouchableOpacity
+                    style={styles.closeCardButton}
+                    onPress={() => setSelectedCafe(null)}
+                  >
+                    <Feather name="x" size={18} color="#A1A1AA" />
                   </TouchableOpacity>
                 </View>
 
+                {/* Mini-Card do Rei do Mês com Foto Real */}
                 <View style={styles.reinadoBox}>
-                  <Text style={{ fontSize: 18 }}>👑</Text>
+                  {selectedCafe.kingAvatar ? (
+                    <Image source={{ uri: selectedCafe.kingAvatar }} style={styles.kingAvatarThumb} />
+                  ) : (
+                    <View style={styles.kingAvatarThumbFallback}>
+                      <Ionicons name="trophy" size={16} color="#F59E0B" />
+                    </View>
+                  )}
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.reinadoKingName}>
-                      Rei do Mês: <Text style={{ color: '#F59E0B' }}>{selectedCafe.currentKing}</Text>
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={styles.reinadoKingTitle}>Rei do Mês:</Text>
+                      <Text style={styles.reinadoKingName}>{selectedCafe.currentKing}</Text>
+                    </View>
                     <Text style={styles.reinadoVisits}>
                       {selectedCafe.kingVisits} visitas acumuladas este mês
                     </Text>
                   </View>
+                  <View style={styles.takeoverTipBadge}>
+                    <Text style={styles.takeoverTipBadgeText}>+2 pts a pé</Text>
+                  </View>
                 </View>
 
+                {/* Voucher de Benefício do Barista */}
                 <View style={styles.perkBox}>
-                  <Text style={{ fontSize: 18 }}>🎁</Text>
-                  <Text style={styles.perkText}>{selectedCafe.perk}</Text>
+                  <View style={styles.perkIconBox}>
+                    <Feather name="gift" size={16} color="#FC4C02" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.perkLabel}>BENEFÍCIO NÍVEL 1</Text>
+                    <Text style={styles.perkText}>{selectedCafe.perk}</Text>
+                  </View>
                 </View>
 
+                {/* 3 Botões de Ação Profissionais */}
                 <View style={styles.bottomSheetActions}>
                   <TouchableOpacity
                     style={[styles.actionBtn, styles.routeBtn]}
@@ -726,7 +701,10 @@ export default function RunCoffeeApp() {
                     {isCalculatingRoute ? (
                       <ActivityIndicator color="#FFF" size="small" />
                     ) : (
-                      <Text style={styles.actionBtnText}>🚶 Traçar Rota</Text>
+                      <>
+                        <Feather name="navigation" size={15} color="#FFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.actionBtnText}>Traçar Rota</Text>
+                      </>
                     )}
                   </TouchableOpacity>
 
@@ -734,7 +712,8 @@ export default function RunCoffeeApp() {
                     style={[styles.actionBtn, styles.checkInBtn]}
                     onPress={() => handleCheckInAttempt(selectedCafe)}
                   >
-                    <Text style={styles.actionBtnText}>📍 Check-in</Text>
+                    <Feather name="check-circle" size={15} color="#FFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionBtnText}>Check-in</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -744,7 +723,8 @@ export default function RunCoffeeApp() {
                       setIsPerkModalVisible(true);
                     }}
                   >
-                    <Text style={styles.actionBtnText}>☕ Resgatar</Text>
+                    <Feather name="clock" size={15} color="#E4E4E7" style={{ marginRight: 6 }} />
+                    <Text style={[styles.actionBtnText, { color: '#E4E4E7' }]}>Cupom 90s</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -752,26 +732,18 @@ export default function RunCoffeeApp() {
           </View>
         )}
 
-        {/* ABA 2: CIRCUITOS (Componente Modular) */}
         {activeTab === 'circuitos' && (
-          <CircuitsTab
-            circuits={circuits}
-            onNavigateToMap={() => setActiveTab('mapa')}
-          />
+          <CircuitsTab circuits={circuits} onNavigateToMap={() => setActiveTab('mapa')} />
         )}
 
-        {/* ABA 3: COMUNIDADE (Componente Modular) */}
         {activeTab === 'comunidade' && (
           <CommunityTab
             posts={communityPosts}
             onToggleCheer={handleToggleCheer}
             onOpenPostModal={() => setIsPostModalVisible(true)}
-            isRunClubJoined={isRunClubJoined}
-            onToggleRunClub={() => setIsRunClubJoined(!isRunClubJoined)}
           />
         )}
 
-        {/* ABA 4: PERFIL (Componente Modular) */}
         {activeTab === 'perfil' && (
           <ProfileTab
             userName={userName}
@@ -780,38 +752,68 @@ export default function RunCoffeeApp() {
             userVisits={userVisits}
             userCrowns={userCrowns}
             userMedals={userMedals}
+            circuits={circuits}
           />
         )}
       </View>
 
-      {/* BARRA INFERIOR (BOTTOM TABS) */}
+      {/* BARRA INFERIOR MODERNA (MAPA NO CENTRO ELEVADO) */}
       <View style={styles.bottomTabBar}>
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('mapa')}>
-          <Text style={{ fontSize: 20 }}>🗺️</Text>
-          <Text style={[styles.tabLabel, activeTab === 'mapa' && styles.tabLabelActive]}>Mapa</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('circuitos')}>
+          <Feather
+            name="compass"
+            size={20}
+            color={activeTab === 'circuitos' ? '#FC4C02' : '#737373'}
+          />
+          <Text style={[styles.tabLabel, activeTab === 'circuitos' && styles.tabLabelActive]}>
+            Circuitos
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('circuitos')}>
-          <Text style={{ fontSize: 20 }}>🏃</Text>
-          <Text style={[styles.tabLabel, activeTab === 'circuitos' && styles.tabLabelActive]}>Circuitos</Text>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setIsNominateModalVisible(true)}>
+          <Feather name="plus-circle" size={20} color="#737373" />
+          <Text style={styles.tabLabel}>Indicar</Text>
+        </TouchableOpacity>
+
+        {/* BOTÃO CENTRAL ELEVADO: MAPA */}
+        <TouchableOpacity
+          style={styles.centerActionButton}
+          activeOpacity={0.85}
+          onPress={handleCenterMapButton}
+        >
+          <View style={styles.centerActionInner}>
+            <Feather name="map" size={24} color="#FFF" />
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('comunidade')}>
-          <Text style={{ fontSize: 20 }}>👥</Text>
-          <Text style={[styles.tabLabel, activeTab === 'comunidade' && styles.tabLabelActive]}>Comunidade</Text>
+          <Feather
+            name="users"
+            size={20}
+            color={activeTab === 'comunidade' ? '#FC4C02' : '#737373'}
+          />
+          <Text style={[styles.tabLabel, activeTab === 'comunidade' && styles.tabLabelActive]}>
+            Clube
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('perfil')}>
-          <Text style={{ fontSize: 20 }}>👤</Text>
-          <Text style={[styles.tabLabel, activeTab === 'perfil' && styles.tabLabelActive]}>Perfil</Text>
+          <Feather
+            name="user"
+            size={20}
+            color={activeTab === 'perfil' ? '#FC4C02' : '#737373'}
+          />
+          <Text style={[styles.tabLabel, activeTab === 'perfil' && styles.tabLabelActive]}>
+            Perfil
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* MODAL 1: BENEFÍCIO DO BARISTA */}
+      {/* MODAL 1: CUPOM DE BENEFÍCIO */}
       <Modal visible={isPerkModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsPerkModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.perkModalCard}>
-            <Text style={{ fontSize: 36 }}>☕</Text>
+            <Ionicons name="cafe-outline" size={40} color="#FC4C02" />
             <Text style={styles.perkModalTitle}>Benefício de Atleta</Text>
             <Text style={styles.perkModalSubtitle}>Mostre esta tela para o barista no caixa para resgatar.</Text>
             <View style={styles.timerBox}>
@@ -829,14 +831,14 @@ export default function RunCoffeeApp() {
       <Modal visible={isTakeoverModalVisible} transparent={true} animationType="slide" onRequestClose={() => setIsTakeoverModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.takeoverModalCard}>
-            <Text style={{ fontSize: 50 }}>👑</Text>
+            <Ionicons name="trophy" size={54} color="#F59E0B" />
             <Text style={styles.takeoverTitle}>Você é o Novo Rei!</Text>
             <Text style={styles.takeoverSubtitle}>
               Parabéns! Você alcançou {newReinadoInfo?.visits} visitas e assumiu o Reinado em{' '}
               <Text style={{ fontWeight: 'bold', color: '#F59E0B' }}>{newReinadoInfo?.cafeName}</Text>!
             </Text>
             <TouchableOpacity style={styles.takeoverBtn} onPress={() => setIsTakeoverModalVisible(false)}>
-              <Text style={styles.takeoverBtnText}>Defender o Título! 🏃‍♂️</Text>
+              <Text style={styles.takeoverBtnText}>Defender o Título!</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -847,15 +849,15 @@ export default function RunCoffeeApp() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalBackdrop}>
           <View style={styles.nominateCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <Text style={styles.nominateTitle}>➕ Indicar Cafeteria</Text>
+              <Text style={styles.nominateTitle}>Indicar Cafeteria</Text>
               <TouchableOpacity onPress={() => setIsNominateModalVisible(false)}>
-                <Text style={{ color: '#A8A29E', fontSize: 18 }}>✕</Text>
+                <Feather name="x" size={20} color="#A8A29E" />
               </TouchableOpacity>
             </View>
-            <TextInput style={styles.modalInput} placeholder="Nome da Cafeteria (Ex: Grão Santo)" placeholderTextColor="#78716C" value={nominateName} onChangeText={setNominateName} />
-            <TextInput style={styles.modalInput} placeholder="Endereço ou Bairro (Ex: Rua Barreto Leme, Cambuí)" placeholderTextColor="#78716C" value={nominateAddress} onChangeText={setNominateAddress} />
-            <TextInput style={styles.modalInput} placeholder="Instagram (Ex: @graosantocafe)" placeholderTextColor="#78716C" value={nominateInstagram} onChangeText={setNominateInstagram} />
-            <TextInput style={styles.modalInput} placeholder="Sugestão de Benefício (Ex: 10% no espresso)" placeholderTextColor="#78716C" value={nominatePerk} onChangeText={setNominatePerk} />
+            <TextInput style={styles.modalInput} placeholder="Nome da Cafeteria" placeholderTextColor="#78716C" value={nominateName} onChangeText={setNominateName} />
+            <TextInput style={styles.modalInput} placeholder="Endereço ou Bairro" placeholderTextColor="#78716C" value={nominateAddress} onChangeText={setNominateAddress} />
+            <TextInput style={styles.modalInput} placeholder="Instagram" placeholderTextColor="#78716C" value={nominateInstagram} onChangeText={setNominateInstagram} />
+            <TextInput style={styles.modalInput} placeholder="Sugestão de Benefício" placeholderTextColor="#78716C" value={nominatePerk} onChangeText={setNominatePerk} />
             <TouchableOpacity style={styles.saveNominationBtn} onPress={handleSaveNomination}>
               <Text style={styles.saveNominationBtnText}>Cadastrar Indicação</Text>
             </TouchableOpacity>
@@ -866,25 +868,25 @@ export default function RunCoffeeApp() {
       {/* MODAL 4: NOVA PUBLICAÇÃO */}
       <Modal visible={isPostModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsPostModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{ backgroundColor: '#1C1917', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, maxHeight: '90%' }}>
+          <View style={{ backgroundColor: '#18181B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, maxHeight: '90%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FFF' }}>✍️ Compartilhar com o Club</Text>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FFF' }}>Compartilhar com o Club</Text>
               <TouchableOpacity onPress={() => setIsPostModalVisible(false)}>
-                <Text style={{ color: '#A8A29E', fontSize: 20 }}>✕</Text>
+                <Feather name="x" size={20} color="#A8A29E" />
               </TouchableOpacity>
             </View>
 
             <TextInput
-              style={{ backgroundColor: '#292524', color: '#FFF', borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12 }}
-              placeholder="Qual cafeteria você visitou? (Ex: Café Container)"
+              style={{ backgroundColor: '#27272A', color: '#FFF', borderRadius: 12, padding: 14, fontSize: 15, marginBottom: 12 }}
+              placeholder="Qual cafeteria você visitou?"
               placeholderTextColor="#78716C"
               value={postCafe}
               onChangeText={setPostCafe}
             />
 
             <TextInput
-              style={{ backgroundColor: '#292524', color: '#FFF', borderRadius: 12, padding: 14, fontSize: 15, height: 100, textAlignVertical: 'top', marginBottom: 14 }}
-              placeholder="Como foi seu treino ou café hoje? (Ex: 5k matinal com espresso no Cambuí 🏃‍♂️☕)"
+              style={{ backgroundColor: '#27272A', color: '#FFF', borderRadius: 12, padding: 14, fontSize: 15, height: 100, textAlignVertical: 'top', marginBottom: 14 }}
+              placeholder="Como foi seu treino ou café hoje?"
               placeholderTextColor="#78716C"
               multiline
               value={postText}
@@ -903,7 +905,7 @@ export default function RunCoffeeApp() {
                 onPress={handlePickPostPhoto}
                 style={{
                   borderWidth: 1,
-                  borderColor: '#44403C',
+                  borderColor: '#3F3F46',
                   borderStyle: 'dashed',
                   borderRadius: 12,
                   padding: 14,
@@ -914,12 +916,12 @@ export default function RunCoffeeApp() {
                   gap: 8,
                 }}
               >
-                <Text style={{ fontSize: 18 }}>📸</Text>
+                <Feather name="camera" size={18} color="#D6D3D1" />
                 <Text style={{ color: '#D6D3D1', fontSize: 14 }}>Adicionar foto do treino / café</Text>
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity onPress={handleCreatePost} style={{ backgroundColor: '#D97706', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}>
+            <TouchableOpacity onPress={handleCreatePost} style={{ backgroundColor: '#FC4C02', paddingVertical: 14, borderRadius: 14, alignItems: 'center' }}>
               <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 16 }}>Publicar no Feed</Text>
             </TouchableOpacity>
           </View>
@@ -932,91 +934,21 @@ export default function RunCoffeeApp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1C1917',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#292524',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#A8A29E',
-    marginTop: 2,
-  },
-  nominateHeaderButton: {
-    backgroundColor: 'rgba(217, 119, 6, 0.15)',
-    borderWidth: 1,
-    borderColor: '#D97706',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-  },
-  nominateHeaderButtonText: {
-    color: '#F59E0B',
-    fontWeight: 'bold',
-    fontSize: 12,
+    backgroundColor: '#0D0D0D',
   },
   mainContent: {
     flex: 1,
   },
   tabContainer: {
     flex: 1,
-    backgroundColor: '#1C1917',
-  },
-  filterPillsWrapper: {
-    position: 'absolute',
-    top: 12,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  filterPillsContainer: {
-    paddingHorizontal: 14,
-    gap: 8,
-  },
-  filterPill: {
-    backgroundColor: '#1C1917',
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#44403C',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  filterPillActive: {
-    backgroundColor: '#EA580C',
-    borderColor: '#EA580C',
-  },
-  filterPillText: {
-    color: '#D6D3D1',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  filterPillTextActive: {
-    color: '#FFF',
-    fontWeight: 'bold',
+    backgroundColor: '#0D0D0D',
   },
   mapWebView: {
     flex: 1,
   },
   centerLocationButton: {
     position: 'absolute',
-    top: 60,
+    top: 20,
     right: 16,
     backgroundColor: '#FFF',
     width: 44,
@@ -1026,21 +958,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     elevation: 5,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 5,
   },
   activeRouteCard: {
     position: 'absolute',
-    top: 60,
+    top: 20,
     left: 16,
     right: 70,
-    backgroundColor: '#1C1917',
+    backgroundColor: '#18181B',
     borderRadius: 16,
     padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D97706',
+    borderColor: '#FC4C02',
     elevation: 6,
   },
   activeRouteTitle: {
@@ -1049,7 +981,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   activeRouteStats: {
-    color: '#D97706',
+    color: '#FC4C02',
     fontSize: 12,
     marginTop: 2,
   },
@@ -1064,67 +996,161 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+
+  // ===================================
+  // NOVO BOTTOMSHEET DARK MODE (STRAVA)
+  // ===================================
   cafeBottomSheet: {
     position: 'absolute',
     bottom: 12,
     left: 12,
     right: 12,
-    backgroundColor: '#1C1917',
-    borderRadius: 20,
-    padding: 18,
+    backgroundColor: '#18181B',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 20,
     borderWidth: 1,
-    borderColor: '#292524',
-    elevation: 8,
+    borderColor: '#27272A',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+  },
+  bottomSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#3F3F46',
+    alignSelf: 'center',
+    marginBottom: 14,
   },
   bottomSheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   bottomSheetTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFF',
   },
+  neighborhoodBadge: {
+    backgroundColor: 'rgba(252, 76, 2, 0.12)',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(252, 76, 2, 0.25)',
+  },
+  neighborhoodBadgeText: {
+    color: '#FC4C02',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   bottomSheetAddress: {
     fontSize: 12,
-    color: '#A8A29E',
-    marginTop: 2,
+    color: '#A1A1AA',
   },
+  closeCardButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#27272A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // REINADO NO CARD
   reinadoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(217, 119, 6, 0.1)',
-    borderRadius: 12,
+    backgroundColor: '#27272A',
+    borderRadius: 14,
     padding: 10,
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  kingAvatarThumb: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+  },
+  kingAvatarThumbFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reinadoKingTitle: {
+    color: '#71717A',
+    fontSize: 11,
   },
   reinadoKingName: {
-    color: '#FFF',
-    fontSize: 13,
+    color: '#F59E0B',
+    fontSize: 12,
     fontWeight: 'bold',
   },
   reinadoVisits: {
-    color: '#A8A29E',
+    color: '#A1A1AA',
     fontSize: 11,
+    marginTop: 1,
   },
+  takeoverTipBadge: {
+    backgroundColor: 'rgba(252, 76, 2, 0.15)',
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 8,
+  },
+  takeoverTipBadgeText: {
+    color: '#FC4C02',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  // VOUCHER DE BENEFÍCIO
   perkBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#292524',
-    borderRadius: 12,
-    padding: 10,
+    backgroundColor: 'rgba(252, 76, 2, 0.08)',
+    borderRadius: 14,
+    padding: 11,
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(252, 76, 2, 0.25)',
+  },
+  perkIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(252, 76, 2, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  perkLabel: {
+    color: '#FC4C02',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   perkText: {
-    color: '#F59E0B',
+    color: '#E4E4E7',
     fontSize: 12,
     fontWeight: '600',
-    flex: 1,
+    marginTop: 2,
   },
+
+  // BOTÕES DO BOTTOMSHEET
   bottomSheetActions: {
     flexDirection: 'row',
     gap: 8,
@@ -1132,30 +1158,39 @@ const styles = StyleSheet.create({
   actionBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   actionBtnText: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
   },
   routeBtn: {
-    backgroundColor: '#EA580C',
+    backgroundColor: '#FC4C02',
   },
   checkInBtn: {
     backgroundColor: '#059669',
   },
   perkBtn: {
-    backgroundColor: '#D97706',
+    backgroundColor: '#27272A',
+    borderWidth: 1,
+    borderColor: '#3F3F46',
   },
+
+  // BARRA INFERIOR
   bottomTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#1C1917',
+    backgroundColor: '#121212',
     borderTopWidth: 1,
-    borderTopColor: '#292524',
-    paddingVertical: 8,
+    borderTopColor: '#262626',
+    paddingVertical: 6,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 8,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    height: Platform.OS === 'ios' ? 74 : 64,
   },
   tabButton: {
     flex: 1,
@@ -1163,14 +1198,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabLabel: {
-    fontSize: 11,
-    color: '#78716C',
+    fontSize: 10,
+    color: '#737373',
     marginTop: 3,
     fontWeight: '600',
+    letterSpacing: 0.2,
   },
   tabLabelActive: {
-    color: '#F59E0B',
+    color: '#FC4C02',
+    fontWeight: 'bold',
   },
+  centerActionButton: {
+    top: -16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FC4C02',
+    shadowColor: '#FC4C02',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 4,
+    borderColor: '#0D0D0D',
+  },
+  centerActionInner: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -1178,12 +1238,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   perkModalCard: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#18181B',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#D97706',
+    borderColor: '#FC4C02',
   },
   perkModalTitle: {
     fontSize: 20,
@@ -1193,12 +1253,12 @@ const styles = StyleSheet.create({
   },
   perkModalSubtitle: {
     fontSize: 13,
-    color: '#A8A29E',
+    color: '#A1A1AA',
     textAlign: 'center',
     marginVertical: 10,
   },
   timerBox: {
-    backgroundColor: '#292524',
+    backgroundColor: '#27272A',
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 28,
@@ -1212,21 +1272,21 @@ const styles = StyleSheet.create({
   },
   timerLabel: {
     fontSize: 12,
-    color: '#78716C',
+    color: '#71717A',
     marginTop: 4,
   },
   closePerkBtn: {
-    backgroundColor: '#292524',
+    backgroundColor: '#27272A',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 14,
   },
   closePerkBtnText: {
-    color: '#A8A29E',
+    color: '#A1A1AA',
     fontWeight: 'bold',
   },
   takeoverModalCard: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#18181B',
     borderRadius: 24,
     padding: 26,
     alignItems: 'center',
@@ -1241,7 +1301,7 @@ const styles = StyleSheet.create({
   },
   takeoverSubtitle: {
     fontSize: 14,
-    color: '#E7E5E4',
+    color: '#E4E4E7',
     textAlign: 'center',
     marginVertical: 14,
     lineHeight: 22,
@@ -1259,11 +1319,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   nominateCard: {
-    backgroundColor: '#1C1917',
+    backgroundColor: '#18181B',
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#44403C',
+    borderColor: '#27272A',
   },
   nominateTitle: {
     fontSize: 18,
@@ -1271,15 +1331,17 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   modalInput: {
-    backgroundColor: '#292524',
+    backgroundColor: '#27272A',
     color: '#FFF',
     borderRadius: 12,
     padding: 13,
     fontSize: 14,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#3F3F46',
   },
   saveNominationBtn: {
-    backgroundColor: '#D97706',
+    backgroundColor: '#FC4C02',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
