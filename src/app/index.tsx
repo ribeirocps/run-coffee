@@ -19,31 +19,33 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-// PALETA DE CORES OFICIAL RUNCOFFEE
+// PALETA OFICIAL RUNCOFFEE
 const THEME = {
-  espresso: '#1C1412',      // Fundo escuro aveludado
-  espressoLight: '#2C201C', // Cartões escuros / cabeçalhos
-  terracotta: '#C85A32',    // Laranja corrida / botão de ação
-  amber: '#DDA15E',         // Dourado para coroas e destaques
+  espresso: '#1C1412',      // Marrom café profundo
+  espressoLight: '#2C201C', // Cartões e cabeçalhos
+  terracotta: '#C85A32',    // Laranja esportivo / corrida
+  amber: '#DDA15E',         // Dourado para coroas e badges
   oatCream: '#F8F5F0',      // Fundo das telas claras
-  cardBg: '#FFFFFF',        // Fundo dos cartões
+  cardBg: '#FFFFFF',        // Cartões
   textDark: '#1C1412',      // Texto principal
-  textMuted: '#7A6E65',     // Texto secundário / legendas
+  textMuted: '#7A6E65',     // Texto secundário
   borderLight: '#EBE5DC',   // Bordas suaves
-  successGreen: '#2D6A4F',  // Check-in concluído
+  successGreen: '#2D6A4F',  // Check-ins
 };
 
 const STORAGE_CAFES_KEY = '@runcoffee_cafes';
 const STORAGE_PROFILE_KEY = '@runcoffee_profile';
 const STORAGE_ONBOARDING_KEY = '@runcoffee_onboarding_done';
 
+// 10 CAFETERIAS ESPECIAIS REAIS DE CAMPINAS
 const INITIAL_CAFES = [
   {
     id: '1',
     name: 'D.Origem Cafés Especiais',
+    shortName: 'D.Origem',
     address: 'R. Antônio Cesarino, 324 - Centro',
-    lat: -22.9056,
-    lng: -47.0583,
+    lat: -22.9068,
+    lng: -47.0516,
     kingName: 'Lucas',
     kingVisits: 10,
     myVisits: 9,
@@ -52,7 +54,8 @@ const INITIAL_CAFES = [
   },
   {
     id: '2',
-    name: 'Wood Especiais',
+    name: 'Wood Especiais - Centro',
+    shortName: 'Wood Centro',
     address: 'R. Dr. Quirino, 1156 - Centro',
     lat: -22.9028,
     lng: -47.0552,
@@ -65,6 +68,7 @@ const INITIAL_CAFES = [
   {
     id: '3',
     name: 'Divino Verde Botânica',
+    shortName: 'Divino Verde',
     address: 'Av. Dr. Moraes Salles, 1288 - Bosque',
     lat: -22.9088,
     lng: -47.0519,
@@ -77,6 +81,7 @@ const INITIAL_CAFES = [
   {
     id: '4',
     name: 'Café Container',
+    shortName: 'Container',
     address: 'R. Antônio Lapa, 1080 - Cambuí',
     lat: -22.8953,
     lng: -47.0494,
@@ -89,6 +94,7 @@ const INITIAL_CAFES = [
   {
     id: '5',
     name: 'Abigail Coffee Co.',
+    shortName: 'Abigail',
     address: 'R. Dr. Guilherme da Silva, 300 - Cambuí',
     lat: -22.8981,
     lng: -47.0489,
@@ -97,6 +103,71 @@ const INITIAL_CAFES = [
     myVisits: 2,
     perk: '10% off para corredores',
     instagram: '@abigailcoffeeco',
+  },
+  {
+    id: '6',
+    name: 'Cafeteria Cambuí',
+    shortName: 'Café Cambuí',
+    address: 'R. Dr. Vieira Bueno, 154 - Cambuí',
+    lat: -22.9004,
+    lng: -47.0526,
+    kingName: 'Sem Rei',
+    kingVisits: 0,
+    myVisits: 1,
+    perk: '10% off no espresso duplo',
+    instagram: '@cafeteriacambui',
+  },
+  {
+    id: '7',
+    name: 'Como Assim?! Café',
+    shortName: 'Como Assim?!',
+    address: 'R. Maria Monteiro, 1269 - Cambuí',
+    lat: -22.8948,
+    lng: -47.0478,
+    kingName: 'Carla',
+    kingVisits: 6,
+    myVisits: 0,
+    perk: 'Bolo artesanal com café coado por R$ 18',
+    instagram: '@comoassimcafe',
+  },
+  {
+    id: '8',
+    name: 'Amo Café',
+    shortName: 'Amo Café',
+    address: 'R. Dr. Emílio Ribas, 487 - Cambuí',
+    lat: -22.8969,
+    lng: -47.0521,
+    kingName: 'Sem Rei',
+    kingVisits: 0,
+    myVisits: 0,
+    perk: 'Água gelada cortesia + 10% no pedido',
+    instagram: '@amocafe',
+  },
+  {
+    id: '9',
+    name: 'Wood Especiais - Nova Campinas',
+    shortName: 'Wood Nova Camp.',
+    address: 'Av. Dr. Hermas Braga, 343 - Nova Campinas',
+    lat: -22.8986,
+    lng: -47.0392,
+    kingName: 'Rafael',
+    kingVisits: 11,
+    myVisits: 0,
+    perk: 'Waffle de pão de queijo com 15% off',
+    instagram: '@woodespeciais',
+  },
+  {
+    id: '10',
+    name: '1727 Coffee Roasters',
+    shortName: '1727 Roasters',
+    address: 'R. José Martins, 603 - Barão Geraldo',
+    lat: -22.8252,
+    lng: -47.0854,
+    kingName: 'Thiago',
+    kingVisits: 15,
+    myVisits: 0,
+    perk: 'Degustação de grão do dia na compra de café',
+    instagram: '@1727coffee',
   },
 ];
 
@@ -111,11 +182,11 @@ const CIRCUITS = [
   },
   {
     id: 'c2',
-    title: 'Circuito Cambuí Loop',
+    title: 'Circuito Cambuí Nobre',
     distance: '2.8 km',
-    badge: '🏅 Medalha Cambuí',
-    desc: 'O circuito mais nobre e movimentado de cafeterias especiais.',
-    cafeIds: ['4', '5'],
+    badge: '🏅 Medalha Cambuí Nobre',
+    desc: 'O circuito mais consagrado de café especial de Campinas.',
+    cafeIds: ['4', '5', '6', '7'],
   },
 ];
 
@@ -243,6 +314,7 @@ export default function App() {
 
   const webViewRef = useRef<WebView>(null);
 
+  // Carrega e mescla com as cafeterias reais
   useEffect(() => {
     const loadStoredData = async () => {
       try {
@@ -252,7 +324,19 @@ export default function App() {
         const savedCafes = await AsyncStorage.getItem(STORAGE_CAFES_KEY);
         const savedProfile = await AsyncStorage.getItem(STORAGE_PROFILE_KEY);
 
-        if (savedCafes) setCafes(JSON.parse(savedCafes));
+        if (savedCafes) {
+          const parsed = JSON.parse(savedCafes);
+          // Garante que as 10 cafeterias reais sempre apareçam
+          const merged = INITIAL_CAFES.map((init) => {
+            const found = parsed.find((p: any) => p.id === init.id);
+            return found ? { ...init, ...found } : init;
+          });
+          const userAdded = parsed.filter((p: any) => !INITIAL_CAFES.some((i) => i.id === p.id));
+          setCafes([...merged, ...userAdded]);
+        } else {
+          setCafes(INITIAL_CAFES);
+        }
+
         if (savedProfile) {
           const parsed = JSON.parse(savedProfile);
           setUserProfile({
@@ -331,6 +415,7 @@ export default function App() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // MAPA COM ESTILO MODERNO CARTODB VOYAGER E PINS DE ALTA DEFINIÇÃO
   const mapHtml = `
     <!DOCTYPE html>
     <html>
@@ -340,45 +425,128 @@ export default function App() {
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
         body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #F8F5F0; }
-        .coffee-pin {
+
+        /* PINO MODERNO: PÍLULA FLUTUANTE ESTILO AIRBNB / GOOGLE MAPS */
+        .modern-pin-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          filter: drop-shadow(0 4px 8px rgba(28, 20, 18, 0.28));
+          cursor: pointer;
+        }
+
+        .modern-pin-badge {
           background: #FFFFFF;
           border: 2px solid #C85A32;
-          border-radius: 50%;
-          text-align: center;
-          font-size: 15px;
-          line-height: 28px;
-          width: 32px !important;
-          height: 32px !important;
-          box-shadow: 0 3px 8px rgba(28, 20, 18, 0.25);
+          border-radius: 20px;
+          padding: 4px 10px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          white-space: nowrap;
         }
-        .user-cup-pin {
+
+        .has-king-badge {
+          border-color: #DDA15E;
+          background: #FFFDF9;
+        }
+
+        .pin-text {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          color: #1C1412;
+          letter-spacing: 0.2px;
+        }
+
+        .pin-pointer {
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 6px solid #C85A32;
+          margin-top: -1px;
+        }
+
+        .has-king-pointer {
+          border-top-color: #DDA15E;
+        }
+
+        /* RADAR GPS DA SUA CANECA */
+        .user-radar-container {
+          position: relative;
+          width: 44px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .user-radar-pulse {
+          position: absolute;
+          width: 44px;
+          height: 44px;
+          border-radius: 22px;
+          background: rgba(200, 90, 50, 0.35);
+          animation: radarWave 2s infinite ease-out;
+        }
+
+        .user-center-cup {
+          width: 34px;
+          height: 34px;
+          border-radius: 17px;
           background: #1C1412;
-          border: 3px solid #DDA15E;
-          border-radius: 50%;
-          text-align: center;
-          font-size: 18px;
-          line-height: 32px;
-          width: 38px !important;
-          height: 38px !important;
-          box-shadow: 0 0 15px rgba(221, 161, 94, 0.9), 0 3px 6px rgba(0,0,0,0.35);
-          animation: pulse 2s infinite;
+          border: 2.5px solid #DDA15E;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+          z-index: 10;
         }
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(221, 161, 94, 0.7); }
-          70% { box-shadow: 0 0 0 12px rgba(221, 161, 94, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(221, 161, 94, 0); }
+
+        @keyframes radarWave {
+          0% { transform: scale(0.6); opacity: 1; }
+          100% { transform: scale(1.6); opacity: 0; }
         }
       </style>
     </head>
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: false }).setView([-22.9025, -47.0535], 15);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+        // Centralizado no coração de Campinas
+        var map = L.map('map', { zoomControl: false }).setView([-22.9015, -47.0515], 15);
+
+        // CAMADA MODERNA CARTODB VOYAGER (Clean, tons pastéis e ruas elegantes)
+       L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+  maxZoom: 20,
+  subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+  attribution: '&copy; Google Maps'
+}).addTo(map);
 
         var cafes = ${JSON.stringify(cafes)};
+
         cafes.forEach(function(cafe) {
-          var icon = L.divIcon({ className: 'coffee-pin', html: '☕', iconSize: [32, 32], iconAnchor: [16, 16] });
+          var hasKing = cafe.kingName && cafe.kingName !== 'Sem Rei';
+          var crownIcon = hasKing ? ' 👑' : '';
+          var label = (cafe.shortName || cafe.name.split(' ')[0]) + crownIcon;
+
+          var customHtml = 
+            '<div class="modern-pin-container">' +
+              '<div class="modern-pin-badge ' + (hasKing ? 'has-king-badge' : '') + '">' +
+                '<span>☕</span>' +
+                '<span class="pin-text">' + label + '</span>' +
+              '</div>' +
+              '<div class="pin-pointer ' + (hasKing ? 'has-king-pointer' : '') + '"></div>' +
+            '</div>';
+
+          var icon = L.divIcon({
+            className: 'custom-leaflet-div',
+            html: customHtml,
+            iconSize: [100, 36],
+            iconAnchor: [50, 36]
+          });
+
           var marker = L.marker([cafe.lat, cafe.lng], { icon: icon }).addTo(map);
           marker.on('click', function() {
             if (window.ReactNativeWebView) {
@@ -390,62 +558,126 @@ export default function App() {
         var userMarker = null;
         var currentRouteLayer = null;
 
+        // Caneca do Usuário com efeito Radar
         window.updateUserPosition = function(lat, lng, recenter) {
-          var userIcon = L.divIcon({ className: 'user-cup-pin', html: '☕', iconSize: [38, 38], iconAnchor: [19, 19] });
+          var userHtml = 
+            '<div class="user-radar-container">' +
+              '<div class="user-radar-pulse"></div>' +
+              '<div class="user-center-cup">☕</div>' +
+            '</div>';
+
+          var userIcon = L.divIcon({
+            className: 'custom-user-div',
+            html: userHtml,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+          });
+
           if (!userMarker) {
-            userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+            userMarker = L.marker([lat, lng], { icon: userIcon, zIndexOffset: 2000 }).addTo(map);
           } else {
             userMarker.setLatLng([lat, lng]);
           }
-          if (recenter) map.setView([lat, lng], 16);
+
+          if (recenter) {
+            map.setView([lat, lng], 16);
+          }
         };
 
         window.centerOnUser = function() {
-          if (userMarker) map.setView(userMarker.getLatLng(), 16);
+          if (userMarker) {
+            map.setView(userMarker.getLatLng(), 16);
+          }
         };
 
+        // Rota de Pedestre com linha Terracota Esportiva
         window.tracePedestrianRoute = function(startLat, startLng, endLat, endLng) {
-          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
+          if (currentRouteLayer) {
+            map.removeLayer(currentRouteLayer);
+            currentRouteLayer = null;
+          }
+
           var url = 'https://router.project-osrm.org/route/v1/foot/' + startLng + ',' + startLat + ';' + endLng + ',' + endLat + '?overview=full&geometries=geojson';
-          fetch(url).then(function(res) { return res.json(); }).then(function(data) {
-            if (data.routes && data.routes.length > 0) {
-              var route = data.routes[0];
-              var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
-              currentRouteLayer = L.polyline(coordinates, { color: '#C85A32', weight: 5, opacity: 0.9, dashArray: '8, 8' }).addTo(map);
-              map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
-              var distKm = (route.distance / 1000).toFixed(1);
-              var durationMin = Math.max(1, Math.round(route.duration / 60));
-              if (window.ReactNativeWebView) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ROUTE_READY', distance: distKm + ' km', duration: '~' + durationMin + ' min' }));
+
+          fetch(url)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (data.routes && data.routes.length > 0) {
+                var route = data.routes[0];
+                var coordinates = route.geometry.coordinates.map(function(c) {
+                  return [c[1], c[0]];
+                });
+
+                currentRouteLayer = L.polyline(coordinates, {
+                  color: '#C85A32',
+                  weight: 5,
+                  opacity: 0.92,
+                  dashArray: '8, 8',
+                  lineJoin: 'round'
+                }).addTo(map);
+
+                map.fitBounds(currentRouteLayer.getBounds(), { padding: [55, 55] });
+
+                var distKm = (route.distance / 1000).toFixed(1);
+                var durationMin = Math.max(1, Math.round(route.duration / 60));
+
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'ROUTE_READY',
+                    distance: distKm + ' km',
+                    duration: '~' + durationMin + ' min'
+                  }));
+                }
               }
-            }
-          }).catch(function() {
-            var coords = [[startLat, startLng], [endLat, endLng]];
-            currentRouteLayer = L.polyline(coords, { color: '#C85A32', weight: 4, dashArray: '5, 5' }).addTo(map);
-            map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
-          });
+            })
+            .catch(function(err) {
+              var coords = [[startLat, startLng], [endLat, endLng]];
+              currentRouteLayer = L.polyline(coords, { color: '#C85A32', weight: 4, dashArray: '5, 5' }).addTo(map);
+              map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
+            });
         };
 
+        // Rota de Circuito com Linha Dourada Âmbar
         window.traceCircuitRoute = function(waypoints) {
-          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
+          if (currentRouteLayer) {
+            map.removeLayer(currentRouteLayer);
+            currentRouteLayer = null;
+          }
+
           var coordString = waypoints.map(function(w) { return w.lng + ',' + w.lat; }).join(';');
           var url = 'https://router.project-osrm.org/route/v1/foot/' + coordString + '?overview=full&geometries=geojson';
-          fetch(url).then(function(res) { return res.json(); }).then(function(data) {
-            if (data.routes && data.routes.length > 0) {
-              var route = data.routes[0];
-              var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
-              currentRouteLayer = L.polyline(coordinates, { color: '#DDA15E', weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(map);
+
+          fetch(url)
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (data.routes && data.routes.length > 0) {
+                var route = data.routes[0];
+                var coordinates = route.geometry.coordinates.map(function(c) {
+                  return [c[1], c[0]];
+                });
+
+                currentRouteLayer = L.polyline(coordinates, {
+                  color: '#DDA15E',
+                  weight: 6,
+                  opacity: 0.95,
+                  lineJoin: 'round'
+                }).addTo(map);
+
+                map.fitBounds(currentRouteLayer.getBounds(), { padding: [65, 65] });
+              }
+            })
+            .catch(function(err) {
+              var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
+              currentRouteLayer = L.polyline(coords, { color: '#DDA15E', weight: 5 }).addTo(map);
               map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
-            }
-          }).catch(function() {
-            var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
-            currentRouteLayer = L.polyline(coords, { color: '#DDA15E', weight: 5 }).addTo(map);
-            map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
-          });
+            });
         };
 
         window.removeRoute = function() {
-          if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
+          if (currentRouteLayer) {
+            map.removeLayer(currentRouteLayer);
+            currentRouteLayer = null;
+          }
         };
       </script>
     </body>
@@ -693,6 +925,7 @@ export default function App() {
     const newCafe = {
       id: String(Date.now()),
       name: formName.trim(),
+      shortName: formName.trim().split(' ')[0],
       address: formAddress.trim(),
       lat: parseFloat(formLat) || -22.8990,
       lng: parseFloat(formLng) || -47.0510,
@@ -729,7 +962,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // TELA DE ONBOARDING COM ESTÉTICA PREMIUM
+  // TELA DE ONBOARDING
   // =========================================================================
   if (onboardingDone === false) {
     const isSignupStep = onboardingStep === 3;
@@ -840,7 +1073,7 @@ export default function App() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-      {/* CABEÇALHO ELEGANTE */}
+      {/* CABEÇALHO */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
@@ -870,7 +1103,6 @@ export default function App() {
               <Text style={styles.gpsButtonText}>🎯</Text>
             </TouchableOpacity>
 
-            {/* Painel de Circuito Ativo */}
             {activeCircuit && (
               <View style={styles.circuitSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -921,7 +1153,6 @@ export default function App() {
               </View>
             )}
 
-            {/* Painel de Rota Individual */}
             {!activeCircuit && activeRoute && (
               <View style={styles.activeRouteSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -995,7 +1226,6 @@ export default function App() {
               </View>
             )}
 
-            {/* Painel da Cafeteria Clicada */}
             {!activeCircuit && !activeRoute && selectedCafe && (
               <View style={styles.bottomSheet}>
                 <View style={styles.sheetHeader}>
@@ -1116,13 +1346,12 @@ export default function App() {
                   <Text style={styles.kingCardName} numberOfLines={1}>
                     {cafe.kingName === userProfile.name ? 'Você!' : cafe.kingName}
                   </Text>
-                  <Text style={styles.kingCardCafe} numberOfLines={1}>{cafe.name.split(' ')[0]}</Text>
+                  <Text style={styles.kingCardCafe} numberOfLines={1}>{cafe.shortName || cafe.name.split(' ')[0]}</Text>
                   <Text style={styles.kingCardVisits}>{cafe.kingVisits} visitas</Text>
                 </View>
               ))}
             </ScrollView>
 
-            {/* Run Club Taquaral */}
             <View style={styles.eventCard}>
               <View style={styles.eventHeaderRow}>
                 <Text style={styles.eventTag}>🏃‍♂️ TREINO COLETIVO</Text>
@@ -1412,7 +1641,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: THEME.espresso,
   },
-  // ONBOARDING
   onboardingContainer: {
     flex: 1,
     backgroundColor: THEME.espresso,
@@ -1611,8 +1839,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
-
-  // CABEÇALHO ELEGANTE
   header: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 55 : 40,
@@ -1652,7 +1878,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-
   tabContentArea: {
     flex: 1,
     backgroundColor: THEME.oatCream,
@@ -1681,8 +1906,6 @@ const styles = StyleSheet.create({
   gpsButtonText: {
     fontSize: 22,
   },
-
-  // BARRA DE NAVEGAÇÃO REFINADA
   bottomTabBar: {
     flexDirection: 'row',
     backgroundColor: THEME.espresso,
@@ -1714,7 +1937,6 @@ const styles = StyleSheet.create({
     color: THEME.amber,
     fontWeight: 'bold',
   },
-
   tabScreenScroll: {
     flex: 1,
     padding: 20,
@@ -1733,8 +1955,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 20,
   },
-
-  // COMUNIDADE
   communitySectionTitle: {
     fontSize: 17,
     fontWeight: 'bold',
@@ -1798,8 +2018,6 @@ const styles = StyleSheet.create({
     color: THEME.textMuted,
     marginTop: 3,
   },
-
-  // EVENTO DE SÁBADO
   eventCard: {
     backgroundColor: THEME.espresso,
     borderRadius: 22,
@@ -1865,8 +2083,6 @@ const styles = StyleSheet.create({
   eventAttendingActiveText: {
     color: '#FFF',
   },
-
-  // FEED DE POSTS
   feedCard: {
     backgroundColor: THEME.cardBg,
     borderRadius: 22,
@@ -1981,8 +2197,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: THEME.textMuted,
   },
-
-  // CIRCUITOS CARDS
   circuitCard: {
     backgroundColor: THEME.cardBg,
     borderRadius: 22,
@@ -2066,8 +2280,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
-  // PERFIL
   profileHeaderCard: {
     backgroundColor: THEME.cardBg,
     borderRadius: 24,
@@ -2230,8 +2442,6 @@ const styles = StyleSheet.create({
     color: '#ADB5BD',
     textDecorationLine: 'underline',
   },
-
-  // PAINEIS DO MAPA
   circuitSheet: {
     position: 'absolute',
     bottom: 25,
@@ -2314,7 +2524,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-
   activeRouteSheet: {
     position: 'absolute',
     bottom: 25,
@@ -2436,7 +2645,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: 'bold',
   },
-
   bottomSheet: {
     position: 'absolute',
     bottom: 25,
@@ -2546,8 +2754,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
-  // MODAIS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(28, 20, 18, 0.75)',
@@ -2638,7 +2844,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
   victoryCard: {
     width: '100%',
     backgroundColor: THEME.espresso,
@@ -2678,7 +2883,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-
   medalCard: {
     width: '100%',
     backgroundColor: '#FFF',
@@ -2725,7 +2929,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-
   formCard: {
     width: '100%',
     maxHeight: '90%',
