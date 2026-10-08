@@ -19,6 +19,20 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 
+// PALETA DE CORES OFICIAL RUNCOFFEE
+const THEME = {
+  espresso: '#1C1412',      // Fundo escuro aveludado
+  espressoLight: '#2C201C', // Cartões escuros / cabeçalhos
+  terracotta: '#C85A32',    // Laranja corrida / botão de ação
+  amber: '#DDA15E',         // Dourado para coroas e destaques
+  oatCream: '#F8F5F0',      // Fundo das telas claras
+  cardBg: '#FFFFFF',        // Fundo dos cartões
+  textDark: '#1C1412',      // Texto principal
+  textMuted: '#7A6E65',     // Texto secundário / legendas
+  borderLight: '#EBE5DC',   // Bordas suaves
+  successGreen: '#2D6A4F',  // Check-in concluído
+};
+
 const STORAGE_CAFES_KEY = '@runcoffee_cafes';
 const STORAGE_PROFILE_KEY = '@runcoffee_profile';
 const STORAGE_ONBOARDING_KEY = '@runcoffee_onboarding_done';
@@ -114,7 +128,6 @@ const INITIAL_PROFILE = {
   medals: ['🏅 Pioneiro RunCoffee'],
 };
 
-// POSTS INICIAIS DO FEED DA COMUNIDADE EM CAMPINAS
 const INITIAL_POSTS = [
   {
     id: 'p1',
@@ -182,7 +195,6 @@ export default function App() {
   const [signupAvatar, setSignupAvatar] = useState('🏃‍♂️');
   const [signupPhotoUri, setSignupPhotoUri] = useState<string | null>(null);
 
-  // 4 ABAS: 'map' | 'circuits' | 'community' | 'profile'
   const [activeTab, setActiveTab] = useState<'map' | 'circuits' | 'community' | 'profile'>('map');
 
   const [cafes, setCafes] = useState(INITIAL_CAFES);
@@ -190,12 +202,10 @@ export default function App() {
   const [selectedCafe, setSelectedCafe] = useState<any>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Estados da Comunidade
   const [posts, setPosts] = useState(INITIAL_POSTS);
   const [isEventAttending, setIsEventAttending] = useState(false);
   const [eventAttendeesCount, setEventAttendeesCount] = useState(24);
 
-  // Rotas e Circuitos
   const [activeRoute, setActiveRoute] = useState<{
     cafe: any;
     distance: string;
@@ -208,25 +218,21 @@ export default function App() {
 
   const targetCafeRef = useRef<any>(null);
 
-  // Anti-fraude
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number>(0);
   const [isVehicleDetected, setIsVehicleDetected] = useState(false);
 
-  // Chegada e Cupom
   const [isArrived, setIsArrived] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [countdown, setCountdown] = useState(90);
   const [redeemingCafe, setRedeemingCafe] = useState<any>(null);
   const [redeemPointsToAdd, setRedeemPointsToAdd] = useState<number>(1);
 
-  // Coroa
   const [crownVictoryData, setCrownVictoryData] = useState<{
     cafeName: string;
     oldKing: string;
     newVisits: number;
   } | null>(null);
 
-  // Formulário de Indicação
   const [showAddCafeModal, setShowAddCafeModal] = useState(false);
   const [formName, setFormName] = useState('');
   const [formAddress, setFormAddress] = useState('');
@@ -333,34 +339,34 @@ export default function App() {
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <style>
-        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #f8f9fa; }
+        body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #F8F5F0; }
         .coffee-pin {
-          background: #ffffff;
-          border: 2px solid #7f4f24;
+          background: #FFFFFF;
+          border: 2px solid #C85A32;
           border-radius: 50%;
           text-align: center;
-          font-size: 16px;
+          font-size: 15px;
           line-height: 28px;
           width: 32px !important;
           height: 32px !important;
-          box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+          box-shadow: 0 3px 8px rgba(28, 20, 18, 0.25);
         }
         .user-cup-pin {
-          background: #2b1b17;
-          border: 3px solid #d4a373;
+          background: #1C1412;
+          border: 3px solid #DDA15E;
           border-radius: 50%;
           text-align: center;
           font-size: 18px;
           line-height: 32px;
           width: 38px !important;
           height: 38px !important;
-          box-shadow: 0 0 15px rgba(212, 163, 115, 0.8), 0 3px 6px rgba(0,0,0,0.35);
+          box-shadow: 0 0 15px rgba(221, 161, 94, 0.9), 0 3px 6px rgba(0,0,0,0.35);
           animation: pulse 2s infinite;
         }
         @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0.7); }
-          70% { box-shadow: 0 0 0 12px rgba(212, 163, 115, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0); }
+          0% { box-shadow: 0 0 0 0 rgba(221, 161, 94, 0.7); }
+          70% { box-shadow: 0 0 0 12px rgba(221, 161, 94, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(221, 161, 94, 0); }
         }
       </style>
     </head>
@@ -405,7 +411,7 @@ export default function App() {
             if (data.routes && data.routes.length > 0) {
               var route = data.routes[0];
               var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
-              currentRouteLayer = L.polyline(coordinates, { color: '#7f4f24', weight: 5, opacity: 0.85, dashArray: '8, 8' }).addTo(map);
+              currentRouteLayer = L.polyline(coordinates, { color: '#C85A32', weight: 5, opacity: 0.9, dashArray: '8, 8' }).addTo(map);
               map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
               var distKm = (route.distance / 1000).toFixed(1);
               var durationMin = Math.max(1, Math.round(route.duration / 60));
@@ -415,7 +421,7 @@ export default function App() {
             }
           }).catch(function() {
             var coords = [[startLat, startLng], [endLat, endLng]];
-            currentRouteLayer = L.polyline(coords, { color: '#7f4f24', weight: 4, dashArray: '5, 5' }).addTo(map);
+            currentRouteLayer = L.polyline(coords, { color: '#C85A32', weight: 4, dashArray: '5, 5' }).addTo(map);
             map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
           });
         };
@@ -428,12 +434,12 @@ export default function App() {
             if (data.routes && data.routes.length > 0) {
               var route = data.routes[0];
               var coordinates = route.geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
-              currentRouteLayer = L.polyline(coordinates, { color: '#d4a373', weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(map);
+              currentRouteLayer = L.polyline(coordinates, { color: '#DDA15E', weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(map);
               map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
             }
           }).catch(function() {
             var coords = waypoints.map(function(w) { return [w.lat, w.lng]; });
-            currentRouteLayer = L.polyline(coords, { color: '#d4a373', weight: 5 }).addTo(map);
+            currentRouteLayer = L.polyline(coords, { color: '#DDA15E', weight: 5 }).addTo(map);
             map.fitBounds(currentRouteLayer.getBounds(), { padding: [60, 60] });
           });
         };
@@ -539,7 +545,6 @@ export default function App() {
         setUserProfile(updatedProfile);
         persistData(cafes, updatedProfile);
 
-        // Adiciona post automático na comunidade
         const newPost = {
           id: String(Date.now()),
           authorName: userProfile.name,
@@ -627,7 +632,6 @@ export default function App() {
       setCafes(updatedCafes);
       persistData(updatedCafes, updatedProfile);
 
-      // Post automático na comunidade
       const newPost = {
         id: String(Date.now()),
         authorName: userProfile.name,
@@ -646,7 +650,6 @@ export default function App() {
     setRedeemingCafe(null);
   };
 
-  // Interação de "Brinde" ☕ no Feed
   const handleToggleCheers = (postId: string) => {
     setPosts((prev) =>
       prev.map((post) => {
@@ -663,7 +666,6 @@ export default function App() {
     );
   };
 
-  // Confirmar presença no Run Club de Sábado
   const handleToggleEventAttendance = () => {
     if (isEventAttending) {
       setIsEventAttending(false);
@@ -671,7 +673,7 @@ export default function App() {
     } else {
       setIsEventAttending(true);
       setEventAttendeesCount((prev) => prev + 1);
-      Alert.alert('Presença Confirmada! 🏃‍♂️☕', 'Te esperamos sábado às 08h na Praça Arautos da Paz (Taquaral). Leve sua garrafinha!');
+      Alert.alert('Presença Confirmada! 🏃‍♂️☕', 'Te esperamos sábado às 08h na Praça Arautos da Paz (Taquaral).');
     }
   };
 
@@ -727,7 +729,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // TELA DE ONBOARDING
+  // TELA DE ONBOARDING COM ESTÉTICA PREMIUM
   // =========================================================================
   if (onboardingDone === false) {
     const isSignupStep = onboardingStep === 3;
@@ -759,9 +761,9 @@ export default function App() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
             style={styles.onboardingSignupContent}
           >
-            <Text style={styles.signupBadge}>SEU PERFIL DE ATLETA</Text>
-            <Text style={styles.signupTitle}>Como você quer aparecer no mapa?</Text>
-            <Text style={styles.signupSubtitle}>Sua foto ou ícone aparecerá no topo do Reinado quando assumir o trono.</Text>
+            <Text style={styles.signupBadge}>PERFIL DE ATLETA</Text>
+            <Text style={styles.signupTitle}>Como quer ser chamado?</Text>
+            <Text style={styles.signupSubtitle}>Sua foto e nome aparecerão no trono das cafeterias de Campinas.</Text>
 
             <TouchableOpacity style={styles.photoPickerContainer} onPress={handlePickImage}>
               {signupPhotoUri ? (
@@ -822,7 +824,7 @@ export default function App() {
             }}
           >
             <Text style={styles.onboardingNextBtnText}>
-              {onboardingStep < 3 ? 'Avançar ➔' : 'Entrar no RunCoffee 🚀'}
+              {onboardingStep < 3 ? 'Avançar ➔' : 'Entrar no Circuito 🚀'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -838,12 +840,12 @@ export default function App() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-      {/* CABEÇALHO */}
+      {/* CABEÇALHO ELEGANTE */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
-            <Text style={styles.headerTitle}>RunCoffee ☕🏃</Text>
-            <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano</Text>
+            <Text style={styles.headerTitle}>RunCoffee</Text>
+            <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano ☕</Text>
           </View>
           <TouchableOpacity style={styles.headerAddBtn} onPress={() => setShowAddCafeModal(true)}>
             <Text style={styles.headerAddBtnText}>➕ Indicar Café</Text>
@@ -868,6 +870,7 @@ export default function App() {
               <Text style={styles.gpsButtonText}>🎯</Text>
             </TouchableOpacity>
 
+            {/* Painel de Circuito Ativo */}
             {activeCircuit && (
               <View style={styles.circuitSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -881,7 +884,7 @@ export default function App() {
                 </View>
 
                 <Text style={styles.circuitProgressText}>
-                  🏁 Progresso: {circuitCompletedCafeIds.length} de {activeCircuit.cafeIds.length} paradas
+                  🏁 {circuitCompletedCafeIds.length} de {activeCircuit.cafeIds.length} paradas carimbadas
                 </Text>
 
                 <View style={styles.stopsList}>
@@ -918,6 +921,7 @@ export default function App() {
               </View>
             )}
 
+            {/* Painel de Rota Individual */}
             {!activeCircuit && activeRoute && (
               <View style={styles.activeRouteSheet}>
                 <View style={styles.routeHeaderRow}>
@@ -953,7 +957,7 @@ export default function App() {
                       </View>
                       <View style={styles.statBox}>
                         <Text style={styles.statLabel}>Velocidade</Text>
-                        <Text style={[styles.statValue, currentSpeedKmh > 20 ? { color: '#dc3545' } : null]}>
+                        <Text style={[styles.statValue, currentSpeedKmh > 20 ? { color: '#C85A32' } : null]}>
                           ⚡ {currentSpeedKmh} km/h
                         </Text>
                       </View>
@@ -967,7 +971,7 @@ export default function App() {
                           setIsArrived(true);
                         }}
                       >
-                        <Text style={styles.simulateWalkText}>🏃 Simular Chegada a Pé</Text>
+                        <Text style={styles.simulateWalkText}>🏃 Simular a Pé</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity 
@@ -991,6 +995,7 @@ export default function App() {
               </View>
             )}
 
+            {/* Painel da Cafeteria Clicada */}
             {!activeCircuit && !activeRoute && selectedCafe && (
               <View style={styles.bottomSheet}>
                 <View style={styles.sheetHeader}>
@@ -1019,7 +1024,7 @@ export default function App() {
                   </View>
 
                   <View style={styles.perkBadge}>
-                    <Text style={styles.perkText}>🎁 Benefício: {selectedCafe.perk}</Text>
+                    <Text style={styles.perkText}>🎁 {selectedCafe.perk}</Text>
                   </View>
                 </View>
 
@@ -1046,9 +1051,9 @@ export default function App() {
         {/* ==================== ABA 2: CIRCUITOS ==================== */}
         {activeTab === 'circuits' && (
           <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
-            <Text style={styles.tabSectionTitle}>Desafios Urbanos de Campinas 🏃‍♂️☕</Text>
+            <Text style={styles.tabSectionTitle}>Desafios Urbanos 🏃‍♂️☕</Text>
             <Text style={styles.tabSectionSubtitle}>
-              Percorra todas as cafeterias do circuito para faturar medalhas exclusivas e defender seu reinado.
+              Conecte cafeterias a pé, fature medalhas colecionáveis e dispute o trono de Campinas.
             </Text>
 
             {CIRCUITS.map((circ) => {
@@ -1089,13 +1094,13 @@ export default function App() {
                 </View>
               );
             })}
+            <View style={{ height: 40 }} />
           </ScrollView>
         )}
 
-        {/* ==================== ABA 3: NOVO! COMUNIDADE (FEED SOCIAL) ==================== */}
+        {/* ==================== ABA 3: COMUNIDADE ==================== */}
         {activeTab === 'community' && (
           <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
-            {/* CARROSSEL DOS REIS ATUAIS */}
             <Text style={styles.communitySectionTitle}>👑 Reis de Campinas nesta Semana</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.kingsCarousel}>
               {cafes.map((cafe) => (
@@ -1117,7 +1122,7 @@ export default function App() {
               ))}
             </ScrollView>
 
-            {/* EVENTO RUN CLUB DE SÁBADO */}
+            {/* Run Club Taquaral */}
             <View style={styles.eventCard}>
               <View style={styles.eventHeaderRow}>
                 <Text style={styles.eventTag}>🏃‍♂️ TREINO COLETIVO</Text>
@@ -1137,8 +1142,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
 
-            {/* FEED DE ATIVIDADES RECENTES */}
-            <Text style={styles.communitySectionTitle}>☕ Atividades Recentes na Cidade</Text>
+            <Text style={styles.communitySectionTitle}>☕ Feed de Atividades</Text>
             {posts.map((post) => (
               <View key={post.id} style={styles.feedCard}>
                 <View style={styles.feedCardHeader}>
@@ -1168,7 +1172,6 @@ export default function App() {
                   </View>
                 ) : null}
 
-                {/* BOTÃO INTERATIVO DE BRINDE ☕ */}
                 <View style={styles.feedFooterRow}>
                   <TouchableOpacity 
                     style={[styles.cheersButton, post.userHasCheered ? styles.cheersButtonActive : null]}
@@ -1183,7 +1186,7 @@ export default function App() {
                 </View>
               </View>
             ))}
-            <View style={{ height: 30 }} />
+            <View style={{ height: 40 }} />
           </ScrollView>
         )}
 
@@ -1220,9 +1223,8 @@ export default function App() {
               </View>
             </View>
 
-            {/* Sala de Troféus */}
             <View style={styles.profileSection}>
-              <Text style={styles.profileSectionTitle}>🏆 Suas Medalhas Conquistadas</Text>
+              <Text style={styles.profileSectionTitle}>🏆 Suas Medalhas</Text>
               <View style={styles.medalsWrap}>
                 {userProfile.medals?.map((med, idx) => (
                   <View key={idx} style={styles.medalPill}>
@@ -1232,7 +1234,6 @@ export default function App() {
               </View>
             </View>
 
-            {/* Cafeterias do Rei */}
             <View style={styles.profileSection}>
               <Text style={styles.profileSectionTitle}>👑 Seus Reinados em Campinas</Text>
               {cafes.filter((c) => c.kingName === userProfile.name).length > 0 ? (
@@ -1242,12 +1243,12 @@ export default function App() {
                     <View key={c.id} style={styles.kingCafeCard}>
                       <Text style={styles.kingCafeTitle}>☕ {c.name}</Text>
                       <Text style={styles.kingCafeDesc}>
-                        Você é o Rei com {c.kingVisits} visitas registradas.
+                        Você é o Rei atual com {c.kingVisits} visitas registradas.
                       </Text>
                     </View>
                   ))
               ) : (
-                <Text style={styles.noKingsText}>Você ainda não possui reinados. Corra até uma cafeteria para conquistar a coroa!</Text>
+                <Text style={styles.noKingsText}>Você ainda não possui reinados. Corra até uma cafeteria para assumir a coroa!</Text>
               )}
             </View>
 
@@ -1269,25 +1270,25 @@ export default function App() {
 
       </View>
 
-      {/* ==================== BARRA DE NAVEGAÇÃO INFERIOR COM 4 ABAS ==================== */}
+      {/* BARRA INFERIOR DE NAVEGAÇÃO REFINADA */}
       <View style={styles.bottomTabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('map')}>
-          <Text style={styles.tabIcon}>🗺️</Text>
+          <Text style={[styles.tabIcon, activeTab === 'map' ? styles.tabIconActive : null]}>🗺️</Text>
           <Text style={[styles.tabLabel, activeTab === 'map' ? styles.tabLabelActive : null]}>Mapa</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('circuits')}>
-          <Text style={styles.tabIcon}>🏃</Text>
+          <Text style={[styles.tabIcon, activeTab === 'circuits' ? styles.tabIconActive : null]}>🏃</Text>
           <Text style={[styles.tabLabel, activeTab === 'circuits' ? styles.tabLabelActive : null]}>Circuitos</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('community')}>
-          <Text style={styles.tabIcon}>👥</Text>
+          <Text style={[styles.tabIcon, activeTab === 'community' ? styles.tabIconActive : null]}>👥</Text>
           <Text style={[styles.tabLabel, activeTab === 'community' ? styles.tabLabelActive : null]}>Comunidade</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.tabItem} onPress={() => setActiveTab('profile')}>
-          <Text style={styles.tabIcon}>👤</Text>
+          <Text style={[styles.tabIcon, activeTab === 'profile' ? styles.tabIconActive : null]}>👤</Text>
           <Text style={[styles.tabLabel, activeTab === 'profile' ? styles.tabLabelActive : null]}>Perfil</Text>
         </TouchableOpacity>
       </View>
@@ -1409,13 +1410,14 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2b1b17',
+    backgroundColor: THEME.espresso,
   },
+  // ONBOARDING
   onboardingContainer: {
     flex: 1,
-    backgroundColor: '#2b1b17',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 60 : 45,
+    backgroundColor: THEME.espresso,
+    paddingHorizontal: 28,
+    paddingTop: Platform.OS === 'ios' ? 65 : 45,
     paddingBottom: Platform.OS === 'ios' ? 40 : 25,
     justifyContent: 'space-between',
   },
@@ -1427,11 +1429,11 @@ const styles = StyleSheet.create({
   onboardingBrand: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#d4a373',
-    letterSpacing: 1,
+    color: THEME.amber,
+    letterSpacing: 1.5,
   },
   onboardingSkipText: {
-    color: '#a89f91',
+    color: '#A89F91',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -1440,113 +1442,114 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   onboardingIconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(212, 163, 115, 0.15)',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: 'rgba(221, 161, 94, 0.12)',
     borderWidth: 2,
-    borderColor: '#d4a373',
+    borderColor: THEME.amber,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 35,
-    shadowColor: '#d4a373',
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: THEME.amber,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
-    shadowRadius: 15,
+    shadowRadius: 18,
   },
   onboardingBigIcon: {
-    fontSize: 50,
+    fontSize: 54,
   },
   onboardingSlideTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFF',
     textAlign: 'center',
     marginBottom: 16,
     letterSpacing: 0.5,
   },
   onboardingSlideSubtitle: {
     fontSize: 15,
-    color: '#d4a373',
+    color: '#D4C7B8',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 15,
+    lineHeight: 25,
+    paddingHorizontal: 10,
   },
   onboardingSignupContent: {
     alignItems: 'center',
     width: '100%',
   },
   signupBadge: {
-    backgroundColor: 'rgba(212, 163, 115, 0.2)',
-    color: '#d4a373',
+    backgroundColor: 'rgba(200, 90, 50, 0.25)',
+    color: THEME.terracotta,
     fontSize: 11,
     fontWeight: 'bold',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 14,
     borderRadius: 12,
     marginBottom: 12,
     letterSpacing: 1,
   },
   signupTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFF',
     textAlign: 'center',
     marginBottom: 8,
   },
   signupSubtitle: {
     fontSize: 13,
-    color: '#adb5bd',
+    color: '#A89F91',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 22,
+    lineHeight: 18,
   },
   photoPickerContainer: {
-    marginBottom: 18,
+    marginBottom: 20,
   },
   photoPlaceholder: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(212, 163, 115, 0.15)',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(221, 161, 94, 0.12)',
     borderWidth: 2,
-    borderColor: '#d4a373',
+    borderColor: THEME.amber,
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
   },
   photoPlaceholderIcon: {
-    fontSize: 26,
+    fontSize: 28,
   },
   photoPlaceholderText: {
-    fontSize: 10,
-    color: '#d4a373',
+    fontSize: 11,
+    color: THEME.amber,
     fontWeight: 'bold',
-    marginTop: 2,
+    marginTop: 4,
   },
   avatarUploadedImg: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 2,
-    borderColor: '#ffd700',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2.5,
+    borderColor: THEME.amber,
   },
   signupInput: {
     width: '100%',
-    backgroundColor: '#3d2721',
+    backgroundColor: THEME.espressoLight,
     borderWidth: 1.5,
-    borderColor: '#d4a373',
-    borderRadius: 14,
-    paddingHorizontal: 16,
+    borderColor: 'rgba(221, 161, 94, 0.4)',
+    borderRadius: 16,
+    paddingHorizontal: 18,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 18,
     textAlign: 'center',
   },
   avatarPickerLabel: {
-    fontSize: 12,
-    color: '#d4a373',
+    fontSize: 13,
+    color: THEME.amber,
     fontWeight: '600',
     marginBottom: 10,
   },
@@ -1555,18 +1558,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatarChoiceBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#3d2721',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: THEME.espressoLight,
     borderWidth: 1.5,
-    borderColor: 'rgba(212, 163, 115, 0.3)',
+    borderColor: 'rgba(221, 161, 94, 0.25)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarChoiceSelected: {
-    borderColor: '#ffd700',
-    backgroundColor: 'rgba(255, 215, 0, 0.25)',
+    borderColor: THEME.amber,
+    backgroundColor: 'rgba(221, 161, 94, 0.25)',
     transform: [{ scale: 1.15 }],
   },
   avatarChoiceText: {
@@ -1579,7 +1582,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 22,
   },
   dotPill: {
     width: 8,
@@ -1588,37 +1591,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   dotPillActive: {
-    width: 24,
-    backgroundColor: '#d4a373',
+    width: 26,
+    backgroundColor: THEME.terracotta,
   },
   onboardingNextBtn: {
-    backgroundColor: '#d4a373',
+    backgroundColor: THEME.terracotta,
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#d4a373',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: THEME.terracotta,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
   },
   onboardingNextBtnText: {
-    color: '#2b1b17',
+    color: '#FFF',
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 0.5,
   },
+
+  // CABEÇALHO ELEGANTE
   header: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 55 : 40,
-    paddingBottom: 14,
-    backgroundColor: '#2b1b17',
+    paddingBottom: 16,
+    backgroundColor: THEME.espresso,
     zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(221, 161, 94, 0.15)',
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -1626,33 +1628,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    letterSpacing: 0.5,
+    color: '#FFF',
+    letterSpacing: 0.8,
   },
   headerSubtitle: {
     fontSize: 12,
-    color: '#d4a373',
+    color: THEME.amber,
     marginTop: 2,
     fontWeight: '500',
   },
   headerAddBtn: {
-    backgroundColor: '#7f4f24',
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    backgroundColor: 'rgba(200, 90, 50, 0.15)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#d4a373',
+    borderColor: THEME.terracotta,
   },
   headerAddBtnText: {
-    color: '#fff',
+    color: THEME.terracotta,
     fontSize: 12,
     fontWeight: 'bold',
   },
+
   tabContentArea: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.oatCream,
   },
   webview: {
     flex: 1,
@@ -1661,30 +1664,32 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     right: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF',
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     elevation: 6,
-    borderWidth: 2,
-    borderColor: '#7f4f24',
+    borderWidth: 1.5,
+    borderColor: THEME.borderLight,
   },
   gpsButtonText: {
     fontSize: 22,
   },
+
+  // BARRA DE NAVEGAÇÃO REFINADA
   bottomTabBar: {
     flexDirection: 'row',
-    backgroundColor: '#2b1b17',
+    backgroundColor: THEME.espresso,
     paddingVertical: 10,
     paddingBottom: Platform.OS === 'ios' ? 24 : 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(212, 163, 115, 0.25)',
+    borderTopColor: 'rgba(221, 161, 94, 0.15)',
   },
   tabItem: {
     flex: 1,
@@ -1694,58 +1699,67 @@ const styles = StyleSheet.create({
   tabIcon: {
     fontSize: 20,
     marginBottom: 2,
+    opacity: 0.5,
+  },
+  tabIconActive: {
+    opacity: 1,
+    transform: [{ scale: 1.1 }],
   },
   tabLabel: {
     fontSize: 11,
-    color: '#a89f91',
+    color: '#8A7D73',
     fontWeight: '500',
   },
   tabLabelActive: {
-    color: '#d4a373',
+    color: THEME.amber,
     fontWeight: 'bold',
   },
+
   tabScreenScroll: {
     flex: 1,
-    padding: 18,
-    backgroundColor: '#f8f9fa',
+    padding: 20,
+    backgroundColor: THEME.oatCream,
   },
   tabSectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginBottom: 4,
+    letterSpacing: 0.3,
   },
   tabSectionSubtitle: {
     fontSize: 13,
-    color: '#6c757d',
-    lineHeight: 18,
-    marginBottom: 16,
+    color: THEME.textMuted,
+    lineHeight: 20,
+    marginBottom: 20,
   },
-  // ESTILOS DA ABA COMUNIDADE
+
+  // COMUNIDADE
   communitySectionTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginBottom: 12,
     marginTop: 4,
+    letterSpacing: 0.2,
   },
   kingsCarousel: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 22,
   },
   kingCarouselCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 20,
+    padding: 14,
     alignItems: 'center',
-    marginRight: 10,
-    width: 105,
+    marginRight: 12,
+    width: 115,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.borderLight,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
     position: 'relative',
   },
@@ -1755,173 +1769,177 @@ const styles = StyleSheet.create({
     right: 8,
   },
   kingAvatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fdf7f2',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FDF7F2',
     borderWidth: 1.5,
-    borderColor: '#d4a373',
+    borderColor: THEME.amber,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
-    marginTop: 4,
+    marginBottom: 8,
+    marginTop: 2,
   },
   kingCardName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     textAlign: 'center',
   },
   kingCardCafe: {
-    fontSize: 10,
-    color: '#7f4f24',
+    fontSize: 11,
+    color: THEME.terracotta,
     fontWeight: '600',
-    marginTop: 1,
+    marginTop: 2,
     textAlign: 'center',
   },
   kingCardVisits: {
     fontSize: 10,
-    color: '#adb5bd',
-    marginTop: 2,
+    color: THEME.textMuted,
+    marginTop: 3,
   },
-  // Card de Evento
+
+  // EVENTO DE SÁBADO
   eventCard: {
-    backgroundColor: '#2b1b17',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 22,
-    borderWidth: 1.5,
-    borderColor: '#d4a373',
+    backgroundColor: THEME.espresso,
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(221, 161, 94, 0.3)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
     elevation: 5,
   },
   eventHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   eventTag: {
-    backgroundColor: '#d4a373',
-    color: '#2b1b17',
+    backgroundColor: THEME.terracotta,
+    color: '#FFF',
     fontSize: 10,
     fontWeight: 'bold',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
     borderRadius: 8,
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   eventDate: {
-    color: '#d4a373',
+    color: THEME.amber,
     fontSize: 12,
     fontWeight: 'bold',
   },
   eventTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 6,
+    color: '#FFF',
+    marginBottom: 8,
+    letterSpacing: 0.3,
   },
   eventDesc: {
-    fontSize: 12,
-    color: '#d4a373',
-    lineHeight: 18,
-    marginBottom: 14,
+    fontSize: 13,
+    color: '#D4C7B8',
+    lineHeight: 20,
+    marginBottom: 16,
   },
   eventAttendBtn: {
-    backgroundColor: '#d4a373',
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: THEME.amber,
+    paddingVertical: 13,
+    borderRadius: 14,
     alignItems: 'center',
   },
   eventAttendingActive: {
-    backgroundColor: '#28a745',
+    backgroundColor: THEME.successGreen,
   },
   eventAttendBtnText: {
-    color: '#2b1b17',
+    color: THEME.espresso,
     fontWeight: 'bold',
     fontSize: 13,
+    letterSpacing: 0.3,
   },
   eventAttendingActiveText: {
-    color: '#fff',
+    color: '#FFF',
   },
-  // Feed Cards
+
+  // FEED DE POSTS
   feedCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 14,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 18,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.borderLight,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
   },
   feedCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   feedAvatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#f8f9fa',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: THEME.oatCream,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
     borderWidth: 1,
-    borderColor: '#ced4da',
+    borderColor: THEME.borderLight,
   },
   feedAuthorName: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
   },
   feedActionText: {
     fontSize: 12,
-    color: '#7f4f24',
+    color: THEME.terracotta,
     fontWeight: '600',
     marginTop: 1,
   },
   feedTimeAgo: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: THEME.textMuted,
   },
   feedStatsBox: {
-    backgroundColor: '#fdf7f2',
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: '#F7F3EE',
+    padding: 10,
+    borderRadius: 10,
     marginVertical: 8,
   },
   feedStatsText: {
     fontSize: 12,
-    color: '#7f4f24',
+    color: THEME.textDark,
     fontWeight: 'bold',
   },
   feedCommentText: {
     fontSize: 13,
-    color: '#495057',
+    color: '#4A3E39',
     fontStyle: 'italic',
-    lineHeight: 18,
-    marginBottom: 8,
+    lineHeight: 20,
+    marginBottom: 10,
   },
   feedBadgePill: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#E8F5E9',
     alignSelf: 'flex-start',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 12,
   },
   feedBadgeText: {
     fontSize: 11,
-    color: '#2e7d32',
+    color: THEME.successGreen,
     fontWeight: 'bold',
   },
   feedFooterRow: {
@@ -1929,23 +1947,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
-    paddingTop: 10,
+    borderTopColor: '#F0ECE6',
+    paddingTop: 12,
     marginTop: 4,
   },
   cheersButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    backgroundColor: THEME.oatCream,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: THEME.borderLight,
   },
   cheersButtonActive: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeeba',
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFEEBA',
   },
   cheersIcon: {
     fontSize: 14,
@@ -1954,28 +1972,29 @@ const styles = StyleSheet.create({
   cheersText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#495057',
+    color: THEME.textDark,
   },
   cheersTextActive: {
     color: '#856404',
   },
   feedCityTag: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: THEME.textMuted,
   },
-  // CIRCUITOS
+
+  // CIRCUITOS CARDS
   circuitCard: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 16,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.borderLight,
   },
   circuitCardHeader: {
     flexDirection: 'row',
@@ -1984,155 +2003,167 @@ const styles = StyleSheet.create({
   },
   circuitCardBadge: {
     fontSize: 11,
-    color: '#7f4f24',
+    color: THEME.terracotta,
     fontWeight: 'bold',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   circuitCardTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 2,
   },
   distanceBadge: {
-    backgroundColor: '#fdf7f2',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    backgroundColor: '#FDF7F2',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#d4a373',
+    borderColor: THEME.terracotta,
   },
   distanceBadgeText: {
     fontSize: 12,
-    color: '#7f4f24',
+    color: THEME.terracotta,
     fontWeight: 'bold',
   },
   circuitCardDesc: {
     fontSize: 13,
-    color: '#6c757d',
-    marginVertical: 10,
-    lineHeight: 18,
+    color: THEME.textMuted,
+    marginVertical: 12,
+    lineHeight: 20,
   },
   circuitCardStopsBox: {
-    backgroundColor: '#f8f9fa',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 14,
+    backgroundColor: THEME.oatCream,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   circuitCardStopsTitle: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#495057',
-    marginBottom: 4,
+    color: THEME.textDark,
+    marginBottom: 6,
   },
   circuitCardStopText: {
     fontSize: 12,
-    color: '#6c757d',
-    lineHeight: 18,
+    color: THEME.textMuted,
+    lineHeight: 20,
   },
   startCircuitBtn: {
-    backgroundColor: '#7f4f24',
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: THEME.terracotta,
+    paddingVertical: 13,
+    borderRadius: 14,
     alignItems: 'center',
+    shadowColor: THEME.terracotta,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   startCircuitBtnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 14,
   },
+
   // PERFIL
   profileHeaderCard: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 24,
+    padding: 22,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
     elevation: 3,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
   },
   avatarCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#2b1b17',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: THEME.espresso,
     borderWidth: 3,
-    borderColor: '#d4a373',
+    borderColor: THEME.amber,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
     position: 'relative',
   },
   avatarProfileImg: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   editPhotoBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: '#fff',
-    padding: 4,
-    borderRadius: 10,
+    backgroundColor: '#FFF',
+    padding: 5,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#d4a373',
+    borderColor: THEME.amber,
   },
   avatarText: {
-    fontSize: 32,
+    fontSize: 34,
   },
   profileBigName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
   },
   profileRoleText: {
     fontSize: 13,
-    color: '#7f4f24',
+    color: THEME.terracotta,
     fontWeight: '600',
     marginTop: 2,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   profileStatsGrid: {
     flexDirection: 'row',
     width: '100%',
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
-    paddingTop: 14,
+    borderTopColor: '#F0ECE6',
+    paddingTop: 16,
   },
   profileGridItem: {
     flex: 1,
     alignItems: 'center',
   },
   profileGridVal: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
   },
   profileGridLabel: {
     fontSize: 11,
-    color: '#6c757d',
+    color: THEME.textMuted,
     marginTop: 2,
   },
   profileSection: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 20,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
   },
   profileSectionTitle: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#2b1b17',
-    marginBottom: 12,
+    color: THEME.textDark,
+    marginBottom: 14,
+    letterSpacing: 0.2,
   },
   medalsWrap: {
     flexDirection: 'row',
@@ -2140,25 +2171,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   medalPill: {
-    backgroundColor: '#fdf7f2',
+    backgroundColor: '#FDF7F2',
     borderWidth: 1,
-    borderColor: '#d4a373',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    borderColor: THEME.amber,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderRadius: 16,
   },
   medalPillText: {
     fontSize: 12,
-    color: '#7f4f24',
+    color: THEME.textDark,
     fontWeight: 'bold',
   },
   kingCafeCard: {
-    backgroundColor: '#fff9db',
+    backgroundColor: '#FFF9DB',
     borderWidth: 1,
-    borderColor: '#ffe066',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: '#FFE066',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
   },
   kingCafeTitle: {
     fontSize: 14,
@@ -2167,25 +2198,25 @@ const styles = StyleSheet.create({
   },
   kingCafeDesc: {
     fontSize: 12,
-    color: '#664d03',
-    marginTop: 2,
+    color: '#664D03',
+    marginTop: 3,
   },
   noKingsText: {
     fontSize: 12,
-    color: '#6c757d',
+    color: THEME.textMuted,
     fontStyle: 'italic',
   },
   seeOnboardingBtn: {
-    backgroundColor: '#fdf7f2',
+    backgroundColor: THEME.cardBg,
     borderWidth: 1.5,
-    borderColor: '#d4a373',
-    paddingVertical: 12,
-    borderRadius: 12,
+    borderColor: THEME.borderLight,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
     marginBottom: 14,
   },
   seeOnboardingBtnText: {
-    color: '#7f4f24',
+    color: THEME.textDark,
     fontSize: 13,
     fontWeight: 'bold',
   },
@@ -2196,35 +2227,37 @@ const styles = StyleSheet.create({
   },
   resetBtnText: {
     fontSize: 12,
-    color: '#adb5bd',
+    color: '#ADB5BD',
     textDecorationLine: 'underline',
   },
+
+  // PAINEIS DO MAPA
   circuitSheet: {
     position: 'absolute',
     bottom: 25,
     left: 16,
     right: 16,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 7,
-    elevation: 10,
-    borderWidth: 2,
-    borderColor: '#d4a373',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: THEME.amber,
   },
   circuitBadgeLabel: {
     fontSize: 11,
-    color: '#b07d4b',
+    color: THEME.terracotta,
     fontWeight: 'bold',
     textTransform: 'uppercase',
   },
   circuitProgressText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 8,
     marginBottom: 6,
   },
@@ -2235,7 +2268,7 @@ const styles = StyleSheet.create({
   stopItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   stopIcon: {
     fontSize: 14,
@@ -2243,34 +2276,32 @@ const styles = StyleSheet.create({
   },
   stopName: {
     fontSize: 13,
-    color: '#495057',
+    color: THEME.textDark,
     fontWeight: '500',
   },
   stopNameChecked: {
     textDecorationLine: 'line-through',
-    color: '#28a745',
+    color: THEME.successGreen,
     fontWeight: 'bold',
   },
   simulateStopBtn: {
-    marginTop: 10,
-    backgroundColor: '#2b1b17',
-    paddingVertical: 11,
-    borderRadius: 10,
+    marginTop: 12,
+    backgroundColor: THEME.espresso,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
   },
   simulateStopBtnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 13,
   },
   circuitDoneBox: {
     marginTop: 10,
-    backgroundColor: '#d4edda',
+    backgroundColor: '#D4EDDA',
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#c3e6cb',
   },
   circuitDoneText: {
     color: '#155724',
@@ -2278,26 +2309,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   circuitDoneSubText: {
-    color: '#28a745',
+    color: THEME.successGreen,
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
   },
+
   activeRouteSheet: {
     position: 'absolute',
     bottom: 25,
     left: 16,
     right: 16,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 7,
-    elevation: 10,
-    borderWidth: 2,
-    borderColor: '#7f4f24',
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1.5,
+    borderColor: THEME.terracotta,
   },
   routeHeaderRow: {
     flexDirection: 'row',
@@ -2307,33 +2339,33 @@ const styles = StyleSheet.create({
   routeTitle: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#7f4f24',
+    color: THEME.terracotta,
     textTransform: 'uppercase',
   },
   routeDest: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 2,
   },
   cancelBtn: {
-    backgroundColor: '#f8d7da',
+    backgroundColor: '#F8D7DA',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   cancelBtnText: {
-    color: '#721c24',
+    color: '#721C24',
     fontSize: 12,
     fontWeight: 'bold',
   },
   vehicleAlertBox: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: '#FFF3CD',
     padding: 8,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#ffeeba',
+    borderColor: '#FFEEBA',
   },
   vehicleAlertText: {
     color: '#856404',
@@ -2348,21 +2380,19 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    backgroundColor: THEME.oatCream,
+    padding: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
   statLabel: {
     fontSize: 10,
-    color: '#6c757d',
+    color: THEME.textMuted,
   },
   statValue: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 2,
   },
   simulationRow: {
@@ -2372,62 +2402,56 @@ const styles = StyleSheet.create({
   },
   simulateWalkBtn: {
     flex: 1,
-    paddingVertical: 9,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
   },
   simulateWalkText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#2e7d32',
+    color: THEME.successGreen,
   },
   simulateCarBtn: {
     flex: 1,
-    paddingVertical: 9,
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
+    paddingVertical: 10,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 10,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffcdd2',
   },
   simulateCarText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#c62828',
+    color: '#C62828',
   },
   checkinButton: {
     marginTop: 14,
-    backgroundColor: '#28a745',
+    backgroundColor: THEME.successGreen,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
-    shadowColor: '#28a745',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-    elevation: 6,
   },
   checkinButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: 'bold',
   },
+
   bottomSheet: {
     position: 'absolute',
     bottom: 25,
     left: 16,
     right: 16,
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    backgroundColor: THEME.cardBg,
+    borderRadius: 22,
+    padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -2435,40 +2459,40 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   cafeTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
   },
   cafeAddress: {
     fontSize: 12,
-    color: '#6c757d',
+    color: THEME.textMuted,
     marginTop: 3,
   },
   cafeInstagram: {
     fontSize: 11,
-    color: '#b07d4b',
+    color: THEME.terracotta,
     fontWeight: '600',
     marginTop: 2,
   },
   closeBtn: {
     fontSize: 18,
-    color: '#888',
+    color: '#999',
     fontWeight: 'bold',
     padding: 4,
   },
   badgesContainer: {
-    marginVertical: 10,
+    marginVertical: 12,
     gap: 6,
   },
   kingBadge: {
-    backgroundColor: '#fff3cd',
+    backgroundColor: '#FFF3CD',
     paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     alignSelf: 'flex-start',
   },
   myKingBadge: {
-    backgroundColor: '#d4edda',
+    backgroundColor: '#D4EDDA',
   },
   kingText: {
     color: '#856404',
@@ -2476,56 +2500,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   perkBadge: {
-    backgroundColor: '#e8f5e9',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    backgroundColor: '#F7F3EE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
   },
   perkText: {
-    color: '#2e7d32',
+    color: THEME.textDark,
     fontWeight: '600',
     fontSize: 12,
   },
   modalitiesContainer: {
-    marginTop: 10,
+    marginTop: 8,
     gap: 8,
   },
   btnRoute: {
-    backgroundColor: '#7f4f24',
-    paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: THEME.terracotta,
+    paddingVertical: 13,
+    borderRadius: 14,
     alignItems: 'center',
+    shadowColor: THEME.terracotta,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   btnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 14,
   },
   btnPitStop: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.oatCream,
     borderWidth: 1.5,
-    borderColor: '#7f4f24',
-    paddingVertical: 11,
-    borderRadius: 12,
+    borderColor: THEME.borderLight,
+    paddingVertical: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   btnPitStopText: {
-    color: '#7f4f24',
+    color: THEME.textDark,
     fontWeight: 'bold',
     fontSize: 14,
   },
+
+  // MODAIS
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(28, 20, 18, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   couponCard: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 22,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     shadowColor: '#000',
@@ -2535,42 +2568,42 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   couponBadge: {
-    backgroundColor: '#d4a373',
-    color: '#2b1b17',
+    backgroundColor: THEME.terracotta,
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 11,
-    paddingVertical: 4,
+    paddingVertical: 5,
     paddingHorizontal: 12,
     borderRadius: 12,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   couponCafeName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 12,
     textAlign: 'center',
   },
   perkHighlightBox: {
-    backgroundColor: '#fdf7f2',
+    backgroundColor: '#FDF7F2',
     borderWidth: 2,
     borderStyle: 'dashed',
-    borderColor: '#7f4f24',
+    borderColor: THEME.terracotta,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     width: '100%',
     marginVertical: 18,
     alignItems: 'center',
   },
   perkHighlightLabel: {
     fontSize: 12,
-    color: '#7f4f24',
-    fontWeight: '600',
+    color: THEME.terracotta,
+    fontWeight: 'bold',
   },
   perkHighlightValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -2580,132 +2613,125 @@ const styles = StyleSheet.create({
   },
   timerLabel: {
     fontSize: 12,
-    color: '#6c757d',
+    color: THEME.textMuted,
   },
   timerValue: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#dc3545',
+    color: '#DC3545',
     letterSpacing: 2,
     marginVertical: 4,
   },
   timerSub: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: '#ADB5BD',
   },
   confirmRedeemBtn: {
-    backgroundColor: '#2b1b17',
+    backgroundColor: THEME.espresso,
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 15,
+    borderRadius: 14,
     alignItems: 'center',
   },
   confirmRedeemText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 14,
   },
+
   victoryCard: {
     width: '100%',
-    backgroundColor: '#2b1b17',
+    backgroundColor: THEME.espresso,
     borderRadius: 24,
     padding: 26,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ffd700',
-    shadowColor: '#ffd700',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 15,
-    elevation: 12,
+    borderColor: THEME.amber,
   },
   victoryIcon: {
     fontSize: 55,
     marginBottom: 10,
   },
   victoryTitle: {
-    color: '#ffd700',
+    color: THEME.amber,
     fontSize: 22,
     fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
   },
   victoryDesc: {
-    color: '#fff',
+    color: '#FFF',
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 22,
     marginVertical: 18,
   },
   victoryBtn: {
-    backgroundColor: '#ffd700',
+    backgroundColor: THEME.amber,
     width: '100%',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   victoryBtnText: {
-    color: '#2b1b17',
+    color: THEME.espresso,
     fontWeight: 'bold',
     fontSize: 15,
   },
+
   medalCard: {
     width: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 26,
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#d4a373',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 12,
+    borderWidth: 2,
+    borderColor: THEME.amber,
   },
   medalIcon: {
     fontSize: 60,
     marginBottom: 8,
   },
   medalTitle: {
-    color: '#7f4f24',
+    color: THEME.terracotta,
     fontSize: 20,
     fontWeight: 'bold',
     letterSpacing: 1,
     textAlign: 'center',
   },
   medalSubtitle: {
-    color: '#2b1b17',
+    color: THEME.textDark,
     fontSize: 16,
     fontWeight: 'bold',
     marginTop: 4,
     marginBottom: 12,
   },
   medalDesc: {
-    color: '#6c757d',
+    color: THEME.textMuted,
     fontSize: 13,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
   },
   medalBtn: {
-    backgroundColor: '#7f4f24',
+    backgroundColor: THEME.terracotta,
     width: '100%',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   medalBtnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 15,
   },
+
   formCard: {
     width: '100%',
     maxHeight: '90%',
-    backgroundColor: '#fff',
-    borderRadius: 22,
-    padding: 22,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
@@ -2718,13 +2744,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#EEE',
     paddingBottom: 10,
   },
   formTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2b1b17',
+    color: THEME.textDark,
   },
   formLabel: {
     fontSize: 13,
@@ -2735,18 +2761,18 @@ const styles = StyleSheet.create({
   },
   formSmallLabel: {
     fontSize: 11,
-    color: '#6c757d',
+    color: THEME.textMuted,
     marginBottom: 2,
   },
   formInput: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.oatCream,
     borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: THEME.borderLight,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     fontSize: 14,
-    color: '#212529',
+    color: THEME.textDark,
   },
   coordsRow: {
     flexDirection: 'row',
@@ -2754,40 +2780,40 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   formInputSmall: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.oatCream,
     borderWidth: 1,
-    borderColor: '#ced4da',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    borderColor: THEME.borderLight,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     fontSize: 12,
-    color: '#495057',
+    color: THEME.textDark,
   },
   useGpsBtn: {
-    backgroundColor: '#e9ecef',
-    paddingVertical: 9,
+    backgroundColor: THEME.oatCream,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#ced4da',
+    borderColor: THEME.borderLight,
   },
   useGpsBtnText: {
-    color: '#495057',
+    color: THEME.textDark,
     fontSize: 12,
     fontWeight: '600',
   },
   submitFormBtn: {
-    backgroundColor: '#2b1b17',
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: THEME.terracotta,
+    paddingVertical: 15,
+    borderRadius: 14,
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 10,
   },
   submitFormBtnText: {
-    color: '#fff',
+    color: '#FFF',
     fontWeight: 'bold',
     fontSize: 15,
   },
