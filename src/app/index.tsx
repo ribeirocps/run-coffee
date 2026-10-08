@@ -5,11 +5,13 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -29,6 +31,7 @@ const INITIAL_CAFES = [
     kingVisits: 10,
     myVisits: 9,
     perk: '10% off em cafés filtrados',
+    instagram: '@dorigemcafe',
   },
   {
     id: '2',
@@ -40,6 +43,7 @@ const INITIAL_CAFES = [
     kingVisits: 8,
     myVisits: 8,
     perk: 'Espresso cortesia no 5º check-in',
+    instagram: '@woodespeciais',
   },
   {
     id: '3',
@@ -51,6 +55,7 @@ const INITIAL_CAFES = [
     kingVisits: 0,
     myVisits: 0,
     perk: '15% off no combo café + fatia',
+    instagram: '@divinoverdecafe',
   },
   {
     id: '4',
@@ -62,6 +67,7 @@ const INITIAL_CAFES = [
     kingVisits: 14,
     myVisits: 4,
     perk: 'Upgrade de tamanho grátis',
+    instagram: '@cafecontainer',
   },
   {
     id: '5',
@@ -73,24 +79,26 @@ const INITIAL_CAFES = [
     kingVisits: 12,
     myVisits: 2,
     perk: '10% off para corredores',
+    instagram: '@abigailcoffeeco',
   },
 ];
 
-// CIRCUITOS OFICIAIS DE CAMPINAS
 const CIRCUITS = [
   {
     id: 'c1',
     title: 'Circuito Centro-Bosque',
     distance: '3.2 km',
     badge: '🏅 Medalha Centro-Bosque',
-    cafeIds: ['1', '2', '3'], // D.Origem, Wood, Divino Verde
+    desc: 'Conecte o polo histórico do Centro ao charme botânico do Bosque.',
+    cafeIds: ['1', '2', '3'],
   },
   {
     id: 'c2',
     title: 'Circuito Cambuí Loop',
     distance: '2.8 km',
     badge: '🏅 Medalha Cambuí',
-    cafeIds: ['4', '5'], // Container, Abigail
+    desc: 'O circuito mais nobre e movimentado de cafeterias especiais.',
+    cafeIds: ['4', '5'],
   },
 ];
 
@@ -102,26 +110,28 @@ const INITIAL_PROFILE = {
 };
 
 export default function App() {
+  // Aba Ativa: 'map' | 'circuits' | 'profile'
+  const [activeTab, setActiveTab] = useState<'map' | 'circuits' | 'profile'>('map');
+
   const [cafes, setCafes] = useState(INITIAL_CAFES);
   const [userProfile, setUserProfile] = useState(INITIAL_PROFILE);
   const [selectedCafe, setSelectedCafe] = useState<any>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Modo Rota Direta
+  // Rotas e Circuitos
   const [activeRoute, setActiveRoute] = useState<{
     cafe: any;
     distance: string;
     duration: string;
   } | null>(null);
 
-  // Modo Circuito Multiparadas
   const [activeCircuit, setActiveCircuit] = useState<any>(null);
   const [circuitCompletedCafeIds, setCircuitCompletedCafeIds] = useState<string[]>([]);
   const [unlockedMedal, setUnlockedMedal] = useState<string | null>(null);
 
   const targetCafeRef = useRef<any>(null);
 
-  // Velocímetro e Anti-Fraude
+  // Anti-fraude
   const [currentSpeedKmh, setCurrentSpeedKmh] = useState<number>(0);
   const [isVehicleDetected, setIsVehicleDetected] = useState(false);
 
@@ -129,15 +139,24 @@ export default function App() {
   const [isArrived, setIsArrived] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [countdown, setCountdown] = useState(90);
-
   const [redeemingCafe, setRedeemingCafe] = useState<any>(null);
   const [redeemPointsToAdd, setRedeemPointsToAdd] = useState<number>(1);
 
+  // Coroa
   const [crownVictoryData, setCrownVictoryData] = useState<{
     cafeName: string;
     oldKing: string;
     newVisits: number;
   } | null>(null);
+
+  // Formulário de Indicação
+  const [showAddCafeModal, setShowAddCafeModal] = useState(false);
+  const [formName, setFormName] = useState('');
+  const [formAddress, setFormAddress] = useState('');
+  const [formInstagram, setFormInstagram] = useState('');
+  const [formPerk, setFormPerk] = useState('');
+  const [formLat, setFormLat] = useState('-22.8990');
+  const [formLng, setFormLng] = useState('-47.0510');
 
   const webViewRef = useRef<WebView>(null);
 
@@ -284,7 +303,6 @@ export default function App() {
           }
         };
 
-        // Rota Direta
         window.tracePedestrianRoute = function(startLat, startLng, endLat, endLng) {
           if (currentRouteLayer) {
             map.removeLayer(currentRouteLayer);
@@ -330,7 +348,6 @@ export default function App() {
             });
         };
 
-        // Rota Multiparadas de Circuito
         window.traceCircuitRoute = function(waypoints) {
           if (currentRouteLayer) {
             map.removeLayer(currentRouteLayer);
@@ -451,8 +468,8 @@ export default function App() {
     }
   };
 
-  // Ativa um Circuito
   const handleSelectCircuit = (circuit: any) => {
+    setActiveTab('map'); // Muda para a aba do mapa automaticamente
     setActiveRoute(null);
     setSelectedCafe(null);
     setActiveCircuit(circuit);
@@ -475,7 +492,6 @@ export default function App() {
     handleRecenter();
   };
 
-  // Carimba a parada do circuito e abre o modal na conclusão
   const handleAdvanceCircuitStop = () => {
     if (!activeCircuit) return;
 
@@ -487,14 +503,10 @@ export default function App() {
       const newCompleted = [...circuitCompletedCafeIds, nextCafeId];
       setCircuitCompletedCafeIds(newCompleted);
 
-      // Concluiu todas as paradas do circuito: Abre a Medalha!
       if (newCompleted.length === activeCircuit.cafeIds.length) {
         const medalWon = activeCircuit.badge;
-
-        // 1. Abre o modal imediatamente
         setUnlockedMedal(medalWon);
 
-        // 2. Atualiza o perfil de forma segura
         const currentMedals = Array.isArray(userProfile.medals) ? userProfile.medals : ['🏅 Pioneiro RunCoffee'];
         const updatedMedals = currentMedals.includes(medalWon) ? currentMedals : [...currentMedals, medalWon];
         const addedKm = parseFloat(activeCircuit.distance) || 3.0;
@@ -618,22 +630,50 @@ export default function App() {
     setRedeemingCafe(null);
   };
 
-  // Exibe a galeria de medalhas e estatísticas ao tocar no chip de perfil
-  const handleViewProfile = () => {
-    const medalsList = userProfile.medals && userProfile.medals.length > 0 
-      ? userProfile.medals.join('\n') 
-      : 'Nenhuma medalha conquistada ainda';
+  const handleUseCurrentLocationForCafe = () => {
+    if (userCoords) {
+      setFormLat(userCoords.lat.toFixed(4));
+      setFormLng(userCoords.lng.toFixed(4));
+      Alert.alert('GPS Capturado 📍', 'Coordenadas preenchidas com sucesso!');
+    }
+  };
 
-    Alert.alert(
-      `Perfil de ${userProfile.name} 🏃‍♂️☕`,
-      `📍 Total Percorrido: ${userProfile.totalKm} km\n👑 Coroas de Reinado: ${userProfile.crownsCount}\n\n🏆 Suas Medalhas:\n${medalsList}\n\n(Dica: segure o dedo para resetar dados de teste)`
-    );
+  const handleSaveNewCafe = () => {
+    if (!formName.trim() || !formAddress.trim()) {
+      Alert.alert('Atenção', 'Informe nome e endereço.');
+      return;
+    }
+
+    const newCafe = {
+      id: String(Date.now()),
+      name: formName.trim(),
+      address: formAddress.trim(),
+      lat: parseFloat(formLat) || -22.8990,
+      lng: parseFloat(formLng) || -47.0510,
+      kingName: 'Sem Rei',
+      kingVisits: 0,
+      myVisits: 0,
+      perk: formPerk.trim() || '10% de boas-vindas RunCoffee',
+      instagram: formInstagram.trim() || '@cafeteria',
+    };
+
+    const updatedCafes = [...cafes, newCafe];
+    setCafes(updatedCafes);
+    persistData(updatedCafes, userProfile);
+
+    setFormName('');
+    setFormAddress('');
+    setFormInstagram('');
+    setFormPerk('');
+    setShowAddCafeModal(false);
+
+    Alert.alert('Sucesso!', `${newCafe.name} adicionado ao mapa.`);
   };
 
   const handleResetData = () => {
     Alert.alert(
       'Resetar Placar',
-      'Deseja apagar os dados salvos e voltar ao início do teste?',
+      'Deseja resetar os dados de teste?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -643,7 +683,7 @@ export default function App() {
             await AsyncStorage.clear();
             setCafes(INITIAL_CAFES);
             setUserProfile(INITIAL_PROFILE);
-            Alert.alert('Pronto', 'Dados resetados para os valores iniciais.');
+            Alert.alert('Pronto', 'Dados reiniciados.');
           },
         },
       ]
@@ -655,243 +695,364 @@ export default function App() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="light" />
 
-      {/* Cabeçalho */}
+      {/* CABEÇALHO COM IDENTIDADE DO APP */}
       <View style={styles.header}>
         <View style={styles.headerTopRow}>
           <View>
             <Text style={styles.headerTitle}>RunCoffee ☕🏃</Text>
-            <Text style={styles.headerSubtitle}>Campinas / SP • Desafios & Circuitos</Text>
+            <Text style={styles.headerSubtitle}>Campinas / SP • Club Urbano</Text>
           </View>
-          {/* Toque para ver medalhas, Segure para resetar */}
-          <TouchableOpacity 
-            style={styles.profileChip} 
-            onPress={handleViewProfile}
-            onLongPress={handleResetData}
-          >
-            <Text style={styles.profileName}>👤 {userProfile.name}</Text>
-            <View style={styles.profileStatsRow}>
-              <Text style={styles.profileStat}>🏃 {userProfile.totalKm} km</Text>
-              <Text style={styles.profileStatDivider}>•</Text>
-              <Text style={styles.profileCrownStat}>👑 {userProfile.crownsCount}</Text>
-            </View>
+          <TouchableOpacity style={styles.headerAddBtn} onPress={() => setShowAddCafeModal(true)}>
+            <Text style={styles.headerAddBtnText}>➕ Indicar Café</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Barra de Circuitos */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.circuitsBar}>
-          <TouchableOpacity 
-            style={[styles.circuitPill, !activeCircuit ? styles.activeCircuitPill : null]}
-            onPress={handleCancelCircuit}
-          >
-            <Text style={[styles.circuitPillText, !activeCircuit ? styles.activeCircuitPillText : null]}>
-              ☕ Todas
-            </Text>
-          </TouchableOpacity>
-
-          {CIRCUITS.map((circ) => {
-            const isSelected = activeCircuit?.id === circ.id;
-            return (
-              <TouchableOpacity
-                key={circ.id}
-                style={[styles.circuitPill, isSelected ? styles.activeCircuitPill : null]}
-                onPress={() => handleSelectCircuit(circ)}
-              >
-                <Text style={[styles.circuitPillText, isSelected ? styles.activeCircuitPillText : null]}>
-                  🏃 {circ.title} ({circ.distance})
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
-      {/* Mapa */}
-      <View style={styles.mapContainer}>
-        <WebView
-          ref={webViewRef}
-          originWhitelist={['*']}
-          source={{ html: mapHtml }}
-          style={styles.webview}
-          onMessage={handleMessage}
-        />
+      {/* ÁREA CENTRAL QUE MUDA CONFORME A ABA SELECIONADA */}
+      <View style={styles.tabContentArea}>
 
-        <TouchableOpacity style={styles.gpsButton} onPress={handleRecenter}>
-          <Text style={styles.gpsButtonText}>🎯</Text>
-        </TouchableOpacity>
-      </View>
+        {/* ==================== ABA 1: MAPA ==================== */}
+        {activeTab === 'map' && (
+          <View style={{ flex: 1 }}>
+            <WebView
+              ref={webViewRef}
+              originWhitelist={['*']}
+              source={{ html: mapHtml }}
+              style={styles.webview}
+              onMessage={handleMessage}
+            />
 
-      {/* PAINEL: CIRCUITO ATIVO */}
-      {activeCircuit && (
-        <View style={styles.circuitSheet}>
-          <View style={styles.routeHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.circuitBadgeLabel}>{activeCircuit.badge}</Text>
-              <Text style={styles.routeDest}>{activeCircuit.title}</Text>
-            </View>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelCircuit}>
-              <Text style={styles.cancelBtnText}>✕ Sair</Text>
+            <TouchableOpacity style={styles.gpsButton} onPress={handleRecenter}>
+              <Text style={styles.gpsButtonText}>🎯</Text>
             </TouchableOpacity>
+
+            {/* Painel de Circuito Ativo no Mapa */}
+            {activeCircuit && (
+              <View style={styles.circuitSheet}>
+                <View style={styles.routeHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.circuitBadgeLabel}>{activeCircuit.badge}</Text>
+                    <Text style={styles.routeDest}>{activeCircuit.title}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelCircuit}>
+                    <Text style={styles.cancelBtnText}>✕ Sair</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.circuitProgressText}>
+                  🏁 Progresso: {circuitCompletedCafeIds.length} de {activeCircuit.cafeIds.length} paradas
+                </Text>
+
+                <View style={styles.stopsList}>
+                  {activeCircuit.cafeIds.map((cId: string, index: number) => {
+                    const cafeObj = cafes.find((c) => c.id === cId);
+                    const isChecked = circuitCompletedCafeIds.includes(cId);
+                    return (
+                      <View key={cId} style={styles.stopItem}>
+                        <Text style={styles.stopIcon}>{isChecked ? '✅' : '📍'}</Text>
+                        <Text style={[styles.stopName, isChecked ? styles.stopNameChecked : null]}>
+                          {index + 1}. {cafeObj?.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {circuitCompletedCafeIds.length < activeCircuit.cafeIds.length ? (
+                  <TouchableOpacity 
+                    style={styles.simulateStopBtn}
+                    onPress={handleAdvanceCircuitStop}
+                  >
+                    <Text style={styles.simulateStopBtnText}>🧪 Carimbar Próxima Parada</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.circuitDoneBox}
+                    onPress={() => setUnlockedMedal(activeCircuit.badge)}
+                  >
+                    <Text style={styles.circuitDoneText}>🎉 Circuito 100% Concluído!</Text>
+                    <Text style={styles.circuitDoneSubText}>Toque aqui para ver sua Medalha 🏅</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Painel de Rota Individual */}
+            {!activeCircuit && activeRoute && (
+              <View style={styles.activeRouteSheet}>
+                <View style={styles.routeHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.routeTitle}>
+                      {isArrived ? '🎉 Você chegou!' : '🏃 Rota em Andamento'}
+                    </Text>
+                    <Text style={styles.routeDest}>{activeRoute.cafe?.name}</Text>
+                  </View>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelRoute}>
+                    <Text style={styles.cancelBtnText}>✕ Sair</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {isVehicleDetected && (
+                  <View style={styles.vehicleAlertBox}>
+                    <Text style={styles.vehicleAlertText}>
+                      ⚠️ Velocidade &gt; 20 km/h! Convertido em visita normal (+1).
+                    </Text>
+                  </View>
+                )}
+
+                {!isArrived ? (
+                  <>
+                    <View style={styles.statsRow}>
+                      <View style={styles.statBox}>
+                        <Text style={styles.statLabel}>Distância</Text>
+                        <Text style={styles.statValue}>📍 {activeRoute.distance}</Text>
+                      </View>
+                      <View style={styles.statBox}>
+                        <Text style={styles.statLabel}>Tempo a pé</Text>
+                        <Text style={styles.statValue}>⏱️ {activeRoute.duration}</Text>
+                      </View>
+                      <View style={styles.statBox}>
+                        <Text style={styles.statLabel}>Velocidade</Text>
+                        <Text style={[styles.statValue, currentSpeedKmh > 20 ? { color: '#dc3545' } : null]}>
+                          ⚡ {currentSpeedKmh} km/h
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.simulationRow}>
+                      <TouchableOpacity 
+                        style={styles.simulateWalkBtn} 
+                        onPress={() => {
+                          setIsVehicleDetected(false);
+                          setIsArrived(true);
+                        }}
+                      >
+                        <Text style={styles.simulateWalkText}>🏃 Simular Chegada a Pé</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.simulateCarBtn} 
+                        onPress={() => {
+                          setIsVehicleDetected(true);
+                          setIsArrived(true);
+                        }}
+                      >
+                        <Text style={styles.simulateCarText}>🚗 Simular Carro</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <TouchableOpacity style={styles.checkinButton} onPress={handleOpenCouponFromRoute}>
+                    <Text style={styles.checkinButtonText}>
+                      {isVehicleDetected ? '📍 Check-in Automóvel (+1 Visita)' : '🎁 Check-in Corrida (+2 Visitas)'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
+            {/* Painel de Cafeteria Clicada */}
+            {!activeCircuit && !activeRoute && selectedCafe && (
+              <View style={styles.bottomSheet}>
+                <View style={styles.sheetHeader}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={styles.cafeTitle}>{selectedCafe.name}</Text>
+                    <Text style={styles.cafeAddress}>{selectedCafe.address}</Text>
+                    {selectedCafe.instagram ? (
+                      <Text style={styles.cafeInstagram}>{selectedCafe.instagram}</Text>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity onPress={() => setSelectedCafe(null)}>
+                    <Text style={styles.closeBtn}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.badgesContainer}>
+                  <View style={[
+                    styles.kingBadge,
+                    selectedCafe.kingName === userProfile.name ? styles.myKingBadge : null
+                  ]}>
+                    <Text style={styles.kingText}>
+                      {selectedCafe.kingName === userProfile.name
+                        ? `👑 VOCÊ É O REI! (${selectedCafe.kingVisits} visitas)`
+                        : `👑 Rei: ${selectedCafe.kingName} (${selectedCafe.kingVisits} visitas) • Suas: ${selectedCafe.myVisits}`}
+                    </Text>
+                  </View>
+
+                  <View style={styles.perkBadge}>
+                    <Text style={styles.perkText}>🎁 Benefício: {selectedCafe.perk}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalitiesContainer}>
+                  <TouchableOpacity
+                    style={styles.btnRoute}
+                    onPress={() => handleStartRoute(selectedCafe)}
+                  >
+                    <Text style={styles.btnText}>🏃 Ir a Pé (+2 Visitas)</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.btnPitStop}
+                    onPress={() => handleDirectCheckin(selectedCafe)}
+                  >
+                    <Text style={styles.btnPitStopText}>📍 Check-in Avulso (+1 Visita)</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
+        )}
 
-          <Text style={styles.circuitProgressText}>
-            🏁 Progresso: {circuitCompletedCafeIds.length} de {activeCircuit.cafeIds.length} paradas carimbadas
-          </Text>
+        {/* ==================== ABA 2: CIRCUITOS ==================== */}
+        {activeTab === 'circuits' && (
+          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
+            <Text style={styles.tabSectionTitle}>Desafios Urbanos de Campinas 🏃‍♂️☕</Text>
+            <Text style={styles.tabSectionSubtitle}>
+              Percorra todas as cafeterias do circuito para faturar medalhas exclusivas e defender seu reinado.
+            </Text>
 
-          <View style={styles.stopsList}>
-            {activeCircuit.cafeIds.map((cId: string, index: number) => {
-              const cafeObj = cafes.find((c) => c.id === cId);
-              const isChecked = circuitCompletedCafeIds.includes(cId);
+            {CIRCUITS.map((circ) => {
+              const circuitCafes = cafes.filter((c) => circ.cafeIds.includes(c.id));
+              const hasMedal = userProfile.medals?.includes(circ.badge);
+
               return (
-                <View key={cId} style={styles.stopItem}>
-                  <Text style={styles.stopIcon}>{isChecked ? '✅' : '📍'}</Text>
-                  <Text style={[styles.stopName, isChecked ? styles.stopNameChecked : null]}>
-                    {index + 1}. {cafeObj?.name}
-                  </Text>
+                <View key={circ.id} style={styles.circuitCard}>
+                  <View style={styles.circuitCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.circuitCardBadge}>{circ.badge}</Text>
+                      <Text style={styles.circuitCardTitle}>{circ.title}</Text>
+                    </View>
+                    <View style={styles.distanceBadge}>
+                      <Text style={styles.distanceBadgeText}>{circ.distance}</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.circuitCardDesc}>{circ.desc}</Text>
+
+                  <View style={styles.circuitCardStopsBox}>
+                    <Text style={styles.circuitCardStopsTitle}>Paradas Obrigatórias:</Text>
+                    {circuitCafes.map((c, i) => (
+                      <Text key={c.id} style={styles.circuitCardStopText}>
+                        • {c.name} ({c.address.split('-')[1]?.trim() || 'Campinas'})
+                      </Text>
+                    ))}
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.startCircuitBtn}
+                    onPress={() => handleSelectCircuit(circ)}
+                  >
+                    <Text style={styles.startCircuitBtnText}>
+                      {hasMedal ? 'Correr Novamente 🏃' : 'Iniciar Desafio no Mapa 🚀'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               );
             })}
-          </View>
+          </ScrollView>
+        )}
 
-          {circuitCompletedCafeIds.length < activeCircuit.cafeIds.length ? (
-            <TouchableOpacity 
-              style={styles.simulateStopBtn}
-              onPress={handleAdvanceCircuitStop}
-            >
-              <Text style={styles.simulateStopBtnText}>🧪 Carimbar Próxima Parada do Circuito</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={styles.circuitDoneBox}
-              onPress={() => setUnlockedMedal(activeCircuit.badge)}
-            >
-              <Text style={styles.circuitDoneText}>🎉 Circuito 100% Concluído!</Text>
-              <Text style={styles.circuitDoneSubText}>Toque aqui para ver sua Medalha 🏅</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+        {/* ==================== ABA 3: PERFIL ==================== */}
+        {activeTab === 'profile' && (
+          <ScrollView style={styles.tabScreenScroll} showsVerticalScrollIndicator={false}>
+            {/* Card do Usuário */}
+            <View style={styles.profileHeaderCard}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarText}>HR</Text>
+              </View>
+              <Text style={styles.profileBigName}>{userProfile.name}</Text>
+              <Text style={styles.profileRoleText}>Coffee Explorer • Campinas</Text>
 
-      {/* PAINEL: ROTA INDIVIDUAL */}
-      {!activeCircuit && activeRoute && (
-        <View style={styles.activeRouteSheet}>
-          <View style={styles.routeHeaderRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.routeTitle}>
-                {isArrived ? '🎉 Você chegou!' : '🏃 Rota em Andamento'}
-              </Text>
-              <Text style={styles.routeDest}>{activeRoute.cafe?.name}</Text>
-            </View>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelRoute}>
-              <Text style={styles.cancelBtnText}>✕ Sair</Text>
-            </TouchableOpacity>
-          </View>
-
-          {isVehicleDetected && (
-            <View style={styles.vehicleAlertBox}>
-              <Text style={styles.vehicleAlertText}>
-                ⚠️ Velocidade acima de 20 km/h detectada! Convertido em visita normal (+1).
-              </Text>
-            </View>
-          )}
-
-          {!isArrived ? (
-            <>
-              <View style={styles.statsRow}>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Distância</Text>
-                  <Text style={styles.statValue}>📍 {activeRoute.distance}</Text>
+              {/* Estatísticas Principais */}
+              <View style={styles.profileStatsGrid}>
+                <View style={styles.profileGridItem}>
+                  <Text style={styles.profileGridVal}>🏃 {userProfile.totalKm}</Text>
+                  <Text style={styles.profileGridLabel}>km a pé</Text>
                 </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Tempo a pé</Text>
-                  <Text style={styles.statValue}>⏱️ {activeRoute.duration}</Text>
+                <View style={styles.profileGridItem}>
+                  <Text style={styles.profileGridVal}>👑 {userProfile.crownsCount}</Text>
+                  <Text style={styles.profileGridLabel}>Reinados</Text>
                 </View>
-                <View style={styles.statBox}>
-                  <Text style={styles.statLabel}>Velocidade</Text>
-                  <Text style={[styles.statValue, currentSpeedKmh > 20 ? { color: '#dc3545' } : null]}>
-                    ⚡ {currentSpeedKmh} km/h
-                  </Text>
+                <View style={styles.profileGridItem}>
+                  <Text style={styles.profileGridVal}>🏅 {userProfile.medals?.length || 0}</Text>
+                  <Text style={styles.profileGridLabel}>Medalhas</Text>
                 </View>
               </View>
+            </View>
 
-              <View style={styles.simulationRow}>
-                <TouchableOpacity 
-                  style={styles.simulateWalkBtn} 
-                  onPress={() => {
-                    setIsVehicleDetected(false);
-                    setIsArrived(true);
-                  }}
-                >
-                  <Text style={styles.simulateWalkText}>🏃 Simular a Pé (&lt;15 km/h)</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.simulateCarBtn} 
-                  onPress={() => {
-                    setIsVehicleDetected(true);
-                    setIsArrived(true);
-                  }}
-                >
-                  <Text style={styles.simulateCarText}>🚗 Simular Carro (&gt;25 km/h)</Text>
-                </TouchableOpacity>
+            {/* Sala de Troféus (Medalhas) */}
+            <View style={styles.profileSection}>
+              <Text style={styles.profileSectionTitle}>🏆 Suas Medalhas Conquistadas</Text>
+              <View style={styles.medalsWrap}>
+                {userProfile.medals?.map((med, idx) => (
+                  <View key={idx} style={styles.medalPill}>
+                    <Text style={styles.medalPillText}>{med}</Text>
+                  </View>
+                ))}
               </View>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.checkinButton} onPress={handleOpenCouponFromRoute}>
-              <Text style={styles.checkinButtonText}>
-                {isVehicleDetected ? '📍 Check-in Automóvel (+1 Visita)' : '🎁 Check-in Corrida (+2 Visitas)'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      {/* PAINEL: DETALHES DA CAFETERIA SELECIONADA */}
-      {!activeCircuit && !activeRoute && selectedCafe && (
-        <View style={styles.bottomSheet}>
-          <View style={styles.sheetHeader}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={styles.cafeTitle}>{selectedCafe.name}</Text>
-              <Text style={styles.cafeAddress}>{selectedCafe.address}</Text>
-            </View>
-            <TouchableOpacity onPress={() => setSelectedCafe(null)}>
-              <Text style={styles.closeBtn}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.badgesContainer}>
-            <View style={[
-              styles.kingBadge,
-              selectedCafe.kingName === userProfile.name ? styles.myKingBadge : null
-            ]}>
-              <Text style={styles.kingText}>
-                {selectedCafe.kingName === userProfile.name
-                  ? `👑 VOCÊ É O REI! (${selectedCafe.kingVisits} visitas)`
-                  : `👑 Rei: ${selectedCafe.kingName} (${selectedCafe.kingVisits} visitas) • Suas: ${selectedCafe.myVisits}`}
-              </Text>
             </View>
 
-            <View style={styles.perkBadge}>
-              <Text style={styles.perkText}>🎁 Benefício: {selectedCafe.perk}</Text>
+            {/* Cafeterias Onde Você é o Rei */}
+            <View style={styles.profileSection}>
+              <Text style={styles.profileSectionTitle}>👑 Seus Reinados em Campinas</Text>
+              {cafes.filter((c) => c.kingName === userProfile.name).length > 0 ? (
+                cafes
+                  .filter((c) => c.kingName === userProfile.name)
+                  .map((c) => (
+                    <View key={c.id} style={styles.kingCafeCard}>
+                      <Text style={styles.kingCafeTitle}>☕ {c.name}</Text>
+                      <Text style={styles.kingCafeDesc}>
+                        Você é o Rei com {c.kingVisits} visitas registradas.
+                      </Text>
+                    </View>
+                  ))
+              ) : (
+                <Text style={styles.noKingsText}>Você ainda não possui reinados. Corra até uma cafeteria para conquistar a coroa!</Text>
+              )}
             </View>
-          </View>
 
-          <View style={styles.modalitiesContainer}>
-            <TouchableOpacity
-              style={styles.btnRoute}
-              onPress={() => handleStartRoute(selectedCafe)}
-            >
-              <Text style={styles.btnText}>🏃 Ir a Pé (+2 Visitas)</Text>
+            {/* Botão de Reset de Testes */}
+            <TouchableOpacity style={styles.resetBtn} onLongPress={handleResetData}>
+              <Text style={styles.resetBtnText}>Segure para Resetar Dados de Teste</Text>
             </TouchableOpacity>
+          </ScrollView>
+        )}
 
-            <TouchableOpacity
-              style={styles.btnPitStop}
-              onPress={() => handleDirectCheckin(selectedCafe)}
-            >
-              <Text style={styles.btnPitStopText}>📍 Check-in Avulso (+1 Visita)</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+      </View>
+
+      {/* ==================== BARRA INFERIOR DE NAVEGAÇÃO (TABS) ==================== */}
+      <View style={styles.bottomTabBar}>
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => setActiveTab('map')}
+        >
+          <Text style={styles.tabIcon}>🗺️</Text>
+          <Text style={[styles.tabLabel, activeTab === 'map' ? styles.tabLabelActive : null]}>
+            Mapa
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => setActiveTab('circuits')}
+        >
+          <Text style={styles.tabIcon}>🏃</Text>
+          <Text style={[styles.tabLabel, activeTab === 'circuits' ? styles.tabLabelActive : null]}>
+            Circuitos
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.tabItem} 
+          onPress={() => setActiveTab('profile')}
+        >
+          <Text style={styles.tabIcon}>👤</Text>
+          <Text style={[styles.tabLabel, activeTab === 'profile' ? styles.tabLabelActive : null]}>
+            Perfil
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* MODAL 1: CUPOM */}
       <Modal visible={showCouponModal} animationType="slide" transparent={true}>
@@ -959,12 +1120,96 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* DICA INICIAL */}
-      {!activeCircuit && !activeRoute && !selectedCafe && (
-        <View style={styles.hintContainer}>
-          <Text style={styles.hintText}>Escolha um Circuito acima ou toque em uma xícara no mapa ☕</Text>
-        </View>
-      )}
+      {/* MODAL 4: FORMULÁRIO DE CADASTRAR CAFETERIA */}
+      <Modal visible={showAddCafeModal} animationType="slide" transparent={true}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.formCard}>
+            <View style={styles.formHeader}>
+              <Text style={styles.formTitle}>☕ Indicar Nova Cafeteria</Text>
+              <TouchableOpacity onPress={() => setShowAddCafeModal(false)}>
+                <Text style={styles.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ width: '100%' }}>
+              <Text style={styles.formLabel}>Nome da Cafeteria *</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ex: Kazu Café"
+                placeholderTextColor="#999"
+                value={formName}
+                onChangeText={setFormName}
+              />
+
+              <Text style={styles.formLabel}>Endereço ou Bairro *</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ex: R. Dr. Emílio Ribas - Cambuí"
+                placeholderTextColor="#999"
+                value={formAddress}
+                onChangeText={setFormAddress}
+              />
+
+              <Text style={styles.formLabel}>Instagram da Cafeteria</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ex: @kazucafe"
+                placeholderTextColor="#999"
+                value={formInstagram}
+                onChangeText={setFormInstagram}
+              />
+
+              <Text style={styles.formLabel}>Mimo ou Sugestão de Parceria</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="Ex: 10% off ou água gelada para corredores"
+                placeholderTextColor="#999"
+                value={formPerk}
+                onChangeText={setFormPerk}
+              />
+
+              <TouchableOpacity 
+                style={styles.useGpsBtn}
+                onPress={handleUseCurrentLocationForCafe}
+              >
+                <Text style={styles.useGpsBtnText}>📍 Estou no local (Preencher meu GPS)</Text>
+              </TouchableOpacity>
+
+              <View style={styles.coordsRow}>
+                <View style={{ flex: 1, marginRight: 6 }}>
+                  <Text style={styles.formSmallLabel}>Latitude:</Text>
+                  <TextInput
+                    style={styles.formInputSmall}
+                    value={formLat}
+                    onChangeText={setFormLat}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <Text style={styles.formSmallLabel}>Longitude:</Text>
+                  <TextInput
+                    style={styles.formInputSmall}
+                    value={formLng}
+                    onChangeText={setFormLng}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.submitFormBtn}
+                onPress={handleSaveNewCafe}
+              >
+                <Text style={styles.submitFormBtnText}>Salvar Indicação no Mapa ✓</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </View>
   );
 }
@@ -977,7 +1222,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 18,
     paddingTop: Platform.OS === 'ios' ? 55 : 40,
-    paddingBottom: 12,
+    paddingBottom: 14,
     backgroundColor: '#2b1b17',
     zIndex: 10,
     shadowColor: '#000',
@@ -1003,68 +1248,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
-  profileChip: {
-    backgroundColor: 'rgba(212, 163, 115, 0.2)',
-    paddingVertical: 6,
+  headerAddBtn: {
+    backgroundColor: '#7f4f24',
+    paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#d4a373',
-    alignItems: 'flex-end',
   },
-  profileName: {
+  headerAddBtnText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  profileStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  profileStat: {
-    color: '#d4a373',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  profileStatDivider: {
-    color: '#d4a373',
-    fontSize: 10,
-  },
-  profileCrownStat: {
-    color: '#ffc107',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  circuitsBar: {
-    marginTop: 10,
-    flexDirection: 'row',
-  },
-  circuitPill: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 163, 115, 0.4)',
-  },
-  activeCircuitPill: {
-    backgroundColor: '#d4a373',
-    borderColor: '#fff',
-  },
-  circuitPillText: {
-    color: '#f8f9fa',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  activeCircuitPillText: {
-    color: '#2b1b17',
-    fontWeight: 'bold',
-  },
-  mapContainer: {
+  tabContentArea: {
     flex: 1,
+    backgroundColor: '#f8f9fa',
   },
   webview: {
     flex: 1,
@@ -1090,6 +1289,260 @@ const styles = StyleSheet.create({
   gpsButtonText: {
     fontSize: 22,
   },
+  // BARRA DE ABAS INFERIOR (TABS)
+  bottomTabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#2b1b17',
+    paddingVertical: 10,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(212, 163, 115, 0.25)',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabIcon: {
+    fontSize: 20,
+    marginBottom: 2,
+  },
+  tabLabel: {
+    fontSize: 11,
+    color: '#a89f91',
+    fontWeight: '500',
+  },
+  tabLabelActive: {
+    color: '#d4a373',
+    fontWeight: 'bold',
+  },
+  // TELAS DAS ABAS (SCROLL)
+  tabScreenScroll: {
+    flex: 1,
+    padding: 18,
+    backgroundColor: '#f8f9fa',
+  },
+  tabSectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+    marginBottom: 4,
+  },
+  tabSectionSubtitle: {
+    fontSize: 13,
+    color: '#6c757d',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  // CARDS DE CIRCUITO
+  circuitCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  circuitCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  circuitCardBadge: {
+    fontSize: 11,
+    color: '#7f4f24',
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+  },
+  circuitCardTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+    marginTop: 2,
+  },
+  distanceBadge: {
+    backgroundColor: '#fdf7f2',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d4a373',
+  },
+  distanceBadgeText: {
+    fontSize: 12,
+    color: '#7f4f24',
+    fontWeight: 'bold',
+  },
+  circuitCardDesc: {
+    fontSize: 13,
+    color: '#6c757d',
+    marginVertical: 10,
+    lineHeight: 18,
+  },
+  circuitCardStopsBox: {
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  circuitCardStopsTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#495057',
+    marginBottom: 4,
+  },
+  circuitCardStopText: {
+    fontSize: 12,
+    color: '#6c757d',
+    lineHeight: 18,
+  },
+  startCircuitBtn: {
+    backgroundColor: '#7f4f24',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  startCircuitBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  // TELA DE PERFIL
+  profileHeaderCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  avatarCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#2b1b17',
+    borderWidth: 3,
+    borderColor: '#d4a373',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  profileBigName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+  },
+  profileRoleText: {
+    fontSize: 13,
+    color: '#7f4f24',
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  profileStatsGrid: {
+    flexDirection: 'row',
+    width: '100%',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+    paddingTop: 14,
+  },
+  profileGridItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  profileGridVal: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+  },
+  profileGridLabel: {
+    fontSize: 11,
+    color: '#6c757d',
+    marginTop: 2,
+  },
+  profileSection: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  profileSectionTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+    marginBottom: 12,
+  },
+  medalsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  medalPill: {
+    backgroundColor: '#fdf7f2',
+    borderWidth: 1,
+    borderColor: '#d4a373',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  medalPillText: {
+    fontSize: 12,
+    color: '#7f4f24',
+    fontWeight: 'bold',
+  },
+  kingCafeCard: {
+    backgroundColor: '#fff9db',
+    borderWidth: 1,
+    borderColor: '#ffe066',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  kingCafeTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#856404',
+  },
+  kingCafeDesc: {
+    fontSize: 12,
+    color: '#664d03',
+    marginTop: 2,
+  },
+  noKingsText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic',
+  },
+  resetBtn: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  resetBtnText: {
+    fontSize: 12,
+    color: '#adb5bd',
+    textDecorationLine: 'underline',
+  },
+  // PAINEIS FLUTUANTES NO MAPA
   circuitSheet: {
     position: 'absolute',
     bottom: 25,
@@ -1306,6 +1759,107 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 25,
+    left: 16,
+    right: 16,
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  cafeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2b1b17',
+  },
+  cafeAddress: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 3,
+  },
+  cafeInstagram: {
+    fontSize: 11,
+    color: '#b07d4b',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  closeBtn: {
+    fontSize: 18,
+    color: '#888',
+    fontWeight: 'bold',
+    padding: 4,
+  },
+  badgesContainer: {
+    marginVertical: 10,
+    gap: 6,
+  },
+  kingBadge: {
+    backgroundColor: '#fff3cd',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  myKingBadge: {
+    backgroundColor: '#d4edda',
+  },
+  kingText: {
+    color: '#856404',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  perkBadge: {
+    backgroundColor: '#e8f5e9',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  perkText: {
+    color: '#2e7d32',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  modalitiesContainer: {
+    marginTop: 10,
+    gap: 8,
+  },
+  btnRoute: {
+    backgroundColor: '#7f4f24',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  btnPitStop: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1.5,
+    borderColor: '#7f4f24',
+    paddingVertical: 11,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  btnPitStopText: {
+    color: '#7f4f24',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  // MODAIS
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -1491,115 +2045,95 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
-  bottomSheet: {
-    position: 'absolute',
-    bottom: 30,
-    left: 16,
-    right: 16,
+  formCard: {
+    width: '100%',
+    maxHeight: '90%',
     backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 22,
+    padding: 22,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 10,
+    shadowRadius: 18,
+    elevation: 12,
   },
-  sheetHeader: {
+  formHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 10,
   },
-  cafeTitle: {
+  formTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2b1b17',
   },
-  cafeAddress: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 3,
-  },
-  closeBtn: {
-    fontSize: 18,
-    color: '#888',
+  formLabel: {
+    fontSize: 13,
     fontWeight: 'bold',
-    padding: 4,
-  },
-  badgesContainer: {
-    marginVertical: 10,
-    gap: 6,
-  },
-  kingBadge: {
-    backgroundColor: '#fff3cd',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  myKingBadge: {
-    backgroundColor: '#d4edda',
-  },
-  kingText: {
-    color: '#856404',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  perkBadge: {
-    backgroundColor: '#e8f5e9',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  perkText: {
-    color: '#2e7d32',
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  modalitiesContainer: {
+    color: '#495057',
     marginTop: 10,
-    gap: 8,
+    marginBottom: 4,
   },
-  btnRoute: {
-    backgroundColor: '#7f4f24',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
+  formSmallLabel: {
+    fontSize: 11,
+    color: '#6c757d',
+    marginBottom: 2,
   },
-  btnText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  btnPitStop: {
+  formInput: {
     backgroundColor: '#f8f9fa',
-    borderWidth: 1.5,
-    borderColor: '#7f4f24',
-    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#212529',
+  },
+  coordsRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  formInputSmall: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    color: '#495057',
+  },
+  useGpsBtn: {
+    backgroundColor: '#e9ecef',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+  },
+  useGpsBtnText: {
+    color: '#495057',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  submitFormBtn: {
+    backgroundColor: '#2b1b17',
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
   },
-  btnPitStopText: {
-    color: '#7f4f24',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  hintContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(43, 27, 23, 0.92)',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    borderRadius: 25,
-    alignItems: 'center',
-  },
-  hintText: {
+  submitFormBtnText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });
