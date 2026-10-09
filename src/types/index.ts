@@ -1,3 +1,11 @@
+export interface PostComment {
+  id: string;
+  userName: string;
+  avatar: string;
+  text: string;
+  timeAgo: string;
+}
+
 export interface Cafe {
   id: string;
   name: string;
@@ -9,7 +17,7 @@ export interface Cafe {
   currentKing?: string;
   rei?: string;
   kingCheckins?: number;
-  kingVisits?: number; // <-- ADICIONE ESTA LINHA AQUI
+  kingVisits?: number;
   visitsCount?: number;
   activePerk?: string;
   perkDurationSeconds?: number;
@@ -52,8 +60,7 @@ export interface CommunityPost {
   distance?: string;
   elevation?: string;
   image?: string;
-  comments?: number;
-  commentsCount?: number;
+  comments?: PostComment[];
   [key: string]: any;
 }
 

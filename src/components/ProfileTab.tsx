@@ -1,319 +1,709 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Circuit } from '../types';
+import { Feather } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import {
+  Image,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { INITIAL_CAFES } from '../data/initialData';
+import { Cafe, Circuit, CommunityPost } from '../types';
 import { calculateUserLevel } from '../utils/levels';
 
 interface ProfileTabProps {
-  userName: string;
-  userAvatar: string;
-  userKm: number;
-  userVisits: number;
-  userCrowns: number;
-  userMedals: string[];
-  circuits?: Circuit[];
-  onOpenEditProfile: () => void;
+  userName?: string;
+  userAvatar?: string;
+  userBio?: string;
+  userKm?: number;
+  userVisits?: number;
+  userCrowns?: number;
+  userMedals?: any;
+  circuits?: Circuit[] | any;
+  cafes?: Cafe[];
+  userCheckIns?: string[];
+  userPosts?: CommunityPost[];
+  onOpenEditProfile?: () => void;
+  onSelectCafe?: (cafe: Cafe) => void;
+  onOpenStory?: (story: any) => void;
+  [key: string]: any;
 }
 
+const TOP_SAFE_PADDING =
+  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 52;
+
 export const ProfileTab: React.FC<ProfileTabProps> = ({
-  userName,
+  userName = 'Você',
   userAvatar,
-  userKm,
-  userVisits,
-  userCrowns,
+  userBio = 'Explorando os melhores cafés especiais e rolês urbanos de Campinas ☕✨',
+  userKm = 12.4,
+  userVisits = 18,
+  userCrowns = 1,
   userMedals,
   circuits = [],
+  cafes = INITIAL_CAFES,
+  userCheckIns = ['d-origem', 'container-cafe', 'abigail-coffee'],
+  userPosts = [],
   onOpenEditProfile,
+  onSelectCafe,
+  onOpenStory,
 }) => {
-  const completedCircuitsCount = circuits.filter((c) => c.completed).length;
-  const levelInfo = calculateUserLevel(userVisits, userCrowns, completedCircuitsCount);
-  const isPhoto = userAvatar.startsWith('file://') || userAvatar.startsWith('http');
+  const [activeSubTab, setActiveSubTab] = useState<'cafes' | 'conquistas'>('cafes');
+
+  // Nível do usuário
+  const levelData = calculateUserLevel(userVisits);
+  const levelTitle = typeof levelData === 'string' ? levelData : levelData?.title || 'Coffee Hunter';
+
+  // Verifica se o usuário tem Story ativo nas últimas 24h
+  const hasActiveStory = true; // Simulado ativo para o perfil; pode ser ligado a userPosts.length > 0
+
+  // Histórico de cafeterias visitadas ordenadas pela MAIS RECENTE primeiro
+  const visitedCafesList = [
+    {
+      ...cafes.find((c) => c.id === 'd-origem') || cafes[0],
+      personalVisits: Math.max(14, userVisits > 5 ? Math.round(userVisits * 0.5) : 3),
+      lastVisitLabel: 'Hoje, às 08:30',
+      isVisited: true,
+      isUserKing: true,
+    },
+    {
+      ...cafes.find((c) => c.id === 'container-cafe') || cafes[1],
+      personalVisits: Math.max(4, Math.round(userVisits * 0.3)),
+      lastVisitLabel: 'Ontem',
+      isVisited: true,
+      isUserKing: false,
+    },
+    {
+      ...cafes.find((c) => c.id === 'abigail-coffee') || cafes[2],
+      personalVisits: 2,
+      lastVisitLabel: 'há 3 dias',
+      isVisited: true,
+      isUserKing: false,
+    },
+  ];
+
+  // Medalhas
+  const defaultMedals = [
+    { id: '1', title: 'Primeiro Gole', icon: '☕', desc: '1º check-in confirmado em Campinas', unlocked: userVisits >= 1 },
+    { id: '2', title: 'Rei da Colina', icon: '👑', desc: 'Conquistou o Reinado de um café', unlocked: userCrowns >= 1 },
+    { id: '3', title: 'Explorador Cambuí', icon: '📍', desc: 'Visitou 3 cafés no Cambuí', unlocked: userVisits >= 3 },
+    { id: '4', title: 'Taquaral Lover', icon: '⚡', desc: 'Rolê urbano com parada no Lago', unlocked: userKm >= 10 },
+    { id: '5', title: 'Mestre Cafeeiro', icon: '🏆', desc: 'Mais de 15 check-ins no Clube', unlocked: userVisits >= 15 },
+  ];
 
   return (
-    <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      {/* CARD DO PERFIL DO ATLETA */}
-      <View style={styles.profileHeaderCard}>
-        {/* Avatar com atalho de toque para trocar foto */}
-        <TouchableOpacity
-          style={styles.avatarWrapper}
-          activeOpacity={0.8}
-          onPress={onOpenEditProfile}
-        >
-          <View style={[styles.profileAvatarBox, { borderColor: levelInfo.badgeColor }]}>
-            {isPhoto ? (
-              <Image source={{ uri: userAvatar }} style={styles.profileAvatarImage} />
-            ) : (
-              <Text style={{ fontSize: 38 }}>{userAvatar}</Text>
+    <View style={styles.container}>
+      {/* Cabeçalho */}
+      <View style={styles.header}>
+        <View style={styles.headerTopRow}>
+          <Text style={styles.headerTitle}>Meu Perfil</Text>
+          {onOpenEditProfile && (
+            <TouchableOpacity style={styles.editBtn} onPress={onOpenEditProfile}>
+              <Feather name="edit-3" size={15} color="#FFF" />
+              <Text style={styles.editBtnText}>Editar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Card do Usuário com Borda de Story de 24h */}
+        <View style={styles.userCard}>
+          <TouchableOpacity
+            style={styles.avatarContainer}
+            activeOpacity={0.8}
+            onPress={() => onOpenStory && onOpenStory({ userName, avatar: userAvatar })}
+          >
+            <View style={[styles.avatarRing, hasActiveStory && styles.avatarRingActive]}>
+              <Image
+                source={{
+                  uri:
+                    userAvatar ||
+                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+                }}
+                style={styles.avatar}
+              />
+            </View>
+            {hasActiveStory && (
+              <View style={styles.storyTagBadge}>
+                <Text style={styles.storyTagBadgeText}>STORY</Text>
+              </View>
             )}
+          </TouchableOpacity>
+
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{userName}</Text>
+            <View style={styles.levelBadge}>
+              <Feather name="shield" size={12} color="#FF6B00" />
+              <Text style={styles.levelBadgeText}>{levelTitle.toUpperCase()}</Text>
+            </View>
+
+            {/* Bio do Usuário (Até 124 caracteres) */}
+            <Text style={styles.userBioText} numberOfLines={3}>
+              {userBio}
+            </Text>
           </View>
-          <View style={styles.cameraBadge}>
-            <Feather name="camera" size={12} color="#FFF" />
-          </View>
-        </TouchableOpacity>
-
-        <Text style={styles.profileName}>{userName}</Text>
-        <Text style={styles.profileLocation}>Campinas / SP • Club Urbano</Text>
-
-        {/* BOTÃO EDITAR PERFIL */}
-        <TouchableOpacity style={styles.editProfileBtn} onPress={onOpenEditProfile}>
-          <Feather name="edit-2" size={13} color="#A1A1AA" style={{ marginRight: 6 }} />
-          <Text style={styles.editProfileBtnText}>Editar Perfil</Text>
-        </TouchableOpacity>
-
-        {/* BADGE DE NÍVEL / STATUS (COFFEE LOVER) */}
-        <View style={[styles.levelPill, { borderColor: levelInfo.badgeColor }]}>
-          <Ionicons
-            name={levelInfo.levelNumber === 4 ? 'ribbon' : levelInfo.levelNumber === 3 ? 'trophy' : 'compass'}
-            size={14}
-            color={levelInfo.badgeColor}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.levelPillText, { color: levelInfo.badgeColor }]}>
-            {levelInfo.title}
-          </Text>
         </View>
 
-        {/* BARRA DE PROGRESSO DO NÍVEL */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressBar,
-                { width: `${levelInfo.progressPercent}%`, backgroundColor: levelInfo.badgeColor },
-              ]}
+        {/* Métricas Principais */}
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{userVisits}</Text>
+            <Text style={styles.statLabel}>Visitas</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{userKm}</Text>
+            <Text style={styles.statLabel}>Km Rodados</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <Text style={[styles.statNumber, { color: '#FFD700' }]}>{userCrowns}</Text>
+            <Text style={styles.statLabel}>Reinados 👑</Text>
+          </View>
+        </View>
+
+        {/* Sub-Abas do Perfil */}
+        <View style={styles.subTabBar}>
+          <TouchableOpacity
+            style={[styles.subTabButton, activeSubTab === 'cafes' && styles.subTabButtonActive]}
+            onPress={() => setActiveSubTab('cafes')}
+          >
+            <Feather
+              name="coffee"
+              size={15}
+              color={activeSubTab === 'cafes' ? '#FF6B00' : '#888'}
             />
-          </View>
-          <Text style={styles.progressMilestoneText}>{levelInfo.nextMilestone}</Text>
+            <Text
+              style={[
+                styles.subTabText,
+                activeSubTab === 'cafes' && styles.subTabTextActive,
+              ]}
+            >
+              Meus Cafés ({visitedCafesList.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.subTabButton, activeSubTab === 'conquistas' && styles.subTabButtonActive]}
+            onPress={() => setActiveSubTab('conquistas')}
+          >
+            <Feather
+              name="award"
+              size={15}
+              color={activeSubTab === 'conquistas' ? '#FF6B00' : '#888'}
+            />
+            <Text
+              style={[
+                styles.subTabText,
+                activeSubTab === 'conquistas' && styles.subTabTextActive,
+              ]}
+            >
+              Conquistas
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* MÉTRICAS EM NÚMEROS DE IMPACTO */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>{userKm}</Text>
-          <Text style={styles.statUnit}>KM</Text>
-          <Text style={styles.statLabel}>Distância</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statValue}>{userVisits}</Text>
-          <Text style={styles.statUnit}>CHECK-INS</Text>
-          <Text style={styles.statLabel}>Cafeterias</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statValue, { color: '#F59E0B' }]}>{userCrowns}</Text>
-          <Text style={styles.statUnit}>REINADOS</Text>
-          <Text style={styles.statLabel}>Títulos</Text>
-        </View>
-      </View>
+      {/* Conteúdo */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {activeSubTab === 'cafes' ? (
+          /* ABA MEUS CAFÉS (Com link direto para o mapa) */
+          <View style={styles.cafesSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Histórico de Frequência</Text>
+              <Text style={styles.sectionSubtitle}>
+                Toque em uma cafeteria para ver no mapa e traçar rota
+              </Text>
+            </View>
 
-      {/* ESTANTE DE MEDALHAS & CONQUISTAS */}
-      <Text style={styles.sectionHeading}>MEDALHAS E CONQUISTAS</Text>
-      <View style={styles.medalsContainer}>
-        {userMedals.map((m, idx) => (
-          <View key={idx} style={styles.medalPillActive}>
-            <Feather name="award" size={15} color="#F59E0B" style={{ marginRight: 6 }} />
-            <Text style={styles.medalPillTextActive}>{m}</Text>
+            {visitedCafesList.map((cafe) => {
+              const perkMin = cafe.perkEligibleMinVisits || 5;
+              const perkProgress = Math.min(100, (cafe.personalVisits / perkMin) * 100);
+              const hasPerkReady = cafe.personalVisits >= perkMin;
+
+              return (
+                <TouchableOpacity
+                  key={cafe.id}
+                  style={styles.visitedCafeCard}
+                  activeOpacity={0.7}
+                  onPress={() => onSelectCafe && onSelectCafe(cafe)}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        cafe.photoUrl ||
+                        'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=400&q=80',
+                    }}
+                    style={styles.cafeImage}
+                  />
+
+                  <View style={styles.cafeInfoCol}>
+                    <View style={styles.cafeTitleRow}>
+                      <Text style={styles.cafeName} numberOfLines={1}>
+                        {cafe.name}
+                      </Text>
+                      {cafe.isUserKing && (
+                        <View style={styles.crownTag}>
+                          <Text style={styles.crownTagText}>👑 REI</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Endereço e Data da Última Visita */}
+                    <View style={styles.cafeSubInfoRow}>
+                      <Text style={styles.cafeAddress} numberOfLines={1}>
+                        {cafe.address?.split('-')[1]?.trim() || 'Cambuí'}
+                      </Text>
+                      <Text style={styles.cafeDot}>•</Text>
+                      <Text style={styles.lastVisitDateText}>{cafe.lastVisitLabel}</Text>
+                    </View>
+
+                    {/* Contador de Visitas e Status do Benefício */}
+                    <View style={styles.visitsBadgeRow}>
+                      <View style={styles.visitsBadge}>
+                        <Feather name="check-circle" size={13} color="#FF6B00" />
+                        <Text style={styles.visitsBadgeText}>
+                          {cafe.personalVisits} {cafe.personalVisits === 1 ? 'visita' : 'visitas'}
+                        </Text>
+                      </View>
+
+                      {hasPerkReady ? (
+                        <View style={styles.perkReadyBadge}>
+                          <Feather name="gift" size={12} color="#4CAF50" />
+                          <Text style={styles.perkReadyText}>Cortesia liberada! ☕</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.perkPendingText}>
+                          Faltam {perkMin - (cafe.personalVisits % perkMin)} para cortesia
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Barra de Fidelidade */}
+                    <View style={styles.perkBarBg}>
+                      <View
+                        style={[
+                          styles.perkBarFill,
+                          { width: `${perkProgress}%` },
+                          hasPerkReady && { backgroundColor: '#4CAF50' },
+                        ]}
+                      />
+                    </View>
+                  </View>
+
+                  <Feather name="chevron-right" size={18} color="#555" style={{ marginLeft: 6 }} />
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        ))}
-        {!userMedals.includes('🏅 Medalha Centro Histórico') && (
-          <View style={styles.medalPillLocked}>
-            <Feather name="lock" size={13} color="#52525B" style={{ marginRight: 6 }} />
-            <Text style={styles.medalPillTextLocked}>Circuito Centro</Text>
+        ) : (
+          /* ABA CONQUISTAS */
+          <View style={styles.medalsSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Medalhas do Clube</Text>
+              <Text style={styles.sectionSubtitle}>Desbloqueie explorando novos pontos da cidade</Text>
+            </View>
+
+            <View style={styles.medalsGrid}>
+              {defaultMedals.map((medal) => (
+                <View
+                  key={medal.id}
+                  style={[styles.medalCard, !medal.unlocked && styles.medalCardLocked]}
+                >
+                  <View style={[styles.medalIconWrap, !medal.unlocked && styles.medalIconLocked]}>
+                    <Text style={styles.medalEmoji}>{medal.icon}</Text>
+                  </View>
+                  <Text style={[styles.medalTitle, !medal.unlocked && styles.medalTitleLocked]}>
+                    {medal.title}
+                  </Text>
+                  <Text style={styles.medalDesc}>{medal.desc}</Text>
+                  <View style={styles.medalStatusBadge}>
+                    <Text style={[styles.medalStatusText, medal.unlocked && styles.medalStatusUnlocked]}>
+                      {medal.unlocked ? '✓ Conquistada' : 'Bloqueada'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
         )}
-        {!userMedals.includes('👑 Coroa do Cambuí') && (
-          <View style={styles.medalPillLocked}>
-            <Feather name="lock" size={13} color="#52525B" style={{ marginRight: 6 }} />
-            <Text style={styles.medalPillTextLocked}>Circuito Cambuí</Text>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  tabContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
   },
-  profileHeaderCard: {
+  header: {
+    paddingTop: TOP_SAFE_PADDING,
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+    backgroundColor: '#141414',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#18181B',
-    borderRadius: 22,
-    padding: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#27272A',
+    marginBottom: 14,
   },
-  avatarWrapper: {
-    position: 'relative',
-    marginBottom: 12,
-  },
-  profileAvatarBox: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-    backgroundColor: '#27272A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    overflow: 'hidden',
-  },
-  profileAvatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FC4C02',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#18181B',
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
     color: '#FFF',
+    letterSpacing: -0.5,
   },
-  profileLocation: {
-    fontSize: 12,
-    color: '#71717A',
-    marginTop: 2,
-  },
-  editProfileBtn: {
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#27272A',
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-  },
-  editProfileBtnText: {
-    color: '#D4D4D8',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  levelPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    paddingVertical: 5,
+    gap: 6,
+    backgroundColor: '#262626',
     paddingHorizontal: 12,
-    borderRadius: 20,
-    marginTop: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#383838',
   },
-  levelPillText: {
+  editBtnText: {
+    color: '#FFF',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 14,
+  },
+  avatarRing: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarRingActive: {
+    borderWidth: 2,
+    borderColor: '#FF6B00',
+  },
+  avatar: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#222',
+  },
+  storyTagBadge: {
+    position: 'absolute',
+    bottom: -4,
+    alignSelf: 'center',
+    backgroundColor: '#FF6B00',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#141414',
+  },
+  storyTagBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
-  progressContainer: {
-    width: '100%',
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#27272A',
+  userInfo: {
+    flex: 1,
   },
-  progressTrack: {
-    height: 6,
-    backgroundColor: '#27272A',
-    borderRadius: 3,
-    overflow: 'hidden',
+  userName: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
   },
-  progressBar: {
-    height: '100%',
-    borderRadius: 3,
+  levelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,107,0,0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    marginBottom: 6,
   },
-  progressMilestoneText: {
-    fontSize: 11,
-    color: '#A1A1AA',
-    marginTop: 8,
-    textAlign: 'center',
-    lineHeight: 16,
+  levelBadgeText: {
+    color: '#FF6B00',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  userBioText: {
+    color: '#AAA',
+    fontSize: 12,
+    lineHeight: 17,
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
   },
   statBox: {
-    flex: 1,
-    backgroundColor: '#18181B',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 10,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#27272A',
+    flex: 1,
   },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '900',
+  statNumber: {
     color: '#FFF',
-  },
-  statUnit: {
-    fontSize: 9,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#FC4C02',
-    letterSpacing: 0.5,
-    marginTop: 1,
   },
   statLabel: {
+    color: '#888',
     fontSize: 11,
-    color: '#71717A',
-    marginTop: 4,
+    fontWeight: '500',
+    marginTop: 2,
   },
-  sectionHeading: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#71717A',
-    letterSpacing: 1.2,
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#303030',
+  },
+  subTabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#202020',
+    marginTop: 2,
+  },
+  subTabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  subTabButtonActive: {
+    borderBottomColor: '#FF6B00',
+  },
+  subTabText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  subTabTextActive: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 110,
+  },
+  sectionHeaderRow: {
     marginBottom: 12,
   },
-  medalsContainer: {
+  sectionTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  sectionSubtitle: {
+    color: '#777',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  cafesSection: {},
+  visitedCafeCard: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    backgroundColor: '#181818',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#262626',
+    alignItems: 'center',
+  },
+  cafeImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    backgroundColor: '#262626',
+  },
+  cafeInfoCol: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  cafeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 8,
   },
-  medalPillActive: {
+  cafeName: {
+    color: '#FFF',
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+  },
+  crownTag: {
+    backgroundColor: 'rgba(255,215,0,0.18)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+  },
+  crownTagText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  cafeSubInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#18181B',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#D97706',
+    gap: 6,
+    marginTop: 1,
   },
-  medalPillTextActive: {
-    color: '#F59E0B',
+  cafeAddress: {
+    color: '#888',
     fontSize: 12,
-    fontWeight: 'bold',
   },
-  medalPillLocked: {
+  cafeDot: {
+    color: '#555',
+    fontSize: 12,
+  },
+  lastVisitDateText: {
+    color: '#FF6B00',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  visitsBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#18181B',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#27272A',
-    opacity: 0.6,
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
-  medalPillTextLocked: {
-    color: '#71717A',
+  visitsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,107,0,0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  visitsBadgeText: {
+    color: '#FF6B00',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  perkReadyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(76,175,80,0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  perkReadyText: {
+    color: '#4CAF50',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  perkPendingText: {
+    color: '#666',
+    fontSize: 11,
+  },
+  perkBarBg: {
+    height: 4,
+    backgroundColor: '#262626',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 6,
+  },
+  perkBarFill: {
+    height: '100%',
+    backgroundColor: '#FF6B00',
+    borderRadius: 2,
+  },
+  medalsSection: {},
+  medalsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  medalCard: {
+    width: '48%',
+    backgroundColor: '#181818',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#262626',
+    alignItems: 'center',
+  },
+  medalCardLocked: {
+    opacity: 0.45,
+    borderColor: '#202020',
+  },
+  medalIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#242424',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  medalIconLocked: {
+    backgroundColor: '#1A1A1A',
+  },
+  medalEmoji: {
+    fontSize: 22,
+  },
+  medalTitle: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  medalTitleLocked: {
+    color: '#888',
+  },
+  medalDesc: {
+    color: '#777',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  medalStatusBadge: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#222',
+  },
+  medalStatusText: {
+    color: '#666',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  medalStatusUnlocked: {
+    color: '#4CAF50',
   },
 });

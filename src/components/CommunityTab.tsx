@@ -1,7 +1,13 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
 import React, { useState } from 'react';
 import {
+  Alert,
+  Dimensions,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -9,35 +15,79 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { CommunityPost } from '../types';
+import { INITIAL_CAFES } from '../data/initialData';
+import { Cafe, CommunityPost, PostComment } from '../types';
+
+const { width } = Dimensions.get('window');
 
 interface CommunityTabProps {
   posts?: CommunityPost[] | any;
   onAddPost?: (post: any) => void;
-  onLikePost?: (postId: string) => void;
-  onOpenCreatePost?: () => void;
   userAvatar?: string;
   userName?: string;
+  cafes?: Cafe[];
   [key: string]: any;
 }
 
 const TOP_SAFE_PADDING =
   Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 52;
 
+const DEFAULT_COMMENTS: PostComment[] = [
+  {
+    id: 'c1',
+    userName: 'Mariana S.',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    text: 'A torra dessa semana está sensacional!',
+    timeAgo: 'há 10 min',
+  },
+  {
+    id: 'c2',
+    userName: 'Lucas "4bens"',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    text: 'Pós-treino no Cambuí é de lei! ☕🔥',
+    timeAgo: 'há 25 min',
+  },
+];
+
 export const CommunityTab: React.FC<CommunityTabProps> = ({
   posts = [],
   onAddPost,
   userAvatar,
   userName = 'Você',
+  cafes = INITIAL_CAFES,
 }) => {
-  const initialList: CommunityPost[] = Array.isArray(posts) ? posts : [];
+  const initialList: CommunityPost[] = (Array.isArray(posts) ? posts : []).map((p) => ({
+    ...p,
+    comments: p.comments && p.comments.length > 0 ? p.comments : DEFAULT_COMMENTS,
+  }));
+
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>(initialList);
-  const [activeStory, setActiveStory] = useState<CommunityPost | null>(null);
+
+  // Controle de Stories Agrupados
+  const [activeStoryGroup, setActiveStoryGroup] = useState<CommunityPost[] | null>(null);
+  const [activeStoryIndex, setActiveStoryIndex] = useState(0);
+
+  // Modal de Comentários
+  const [isCommentsModalVisible, setIsCommentsModalVisible] = useState(false);
+  const [currentPostForComments, setCurrentPostForComments] = useState<CommunityPost | null>(null);
+  const [newCommentText, setNewCommentText] = useState('');
+
+  // Modal de Foto em Tela Cheia do Feed
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
 
+  // Estados para Criar Novo Story
+  const [isCreateStoryVisible, setIsCreateStoryVisible] = useState(false);
+  const [storyImageUri, setStoryImageUri] = useState<string | null>(null);
+  const [storyText, setStoryText] = useState('');
+  const [selectedCafeName, setSelectedCafeName] = useState(cafes[0]?.name || 'D.Origem Cafés Especiais');
+  const [isCustomCafe, setIsCustomCafe] = useState(false);
+  const [customCafeName, setCustomCafeName] = useState('');
+
+  // Curtir com Cafezinho
   const handleToggleLike = (postId: string) => {
     setFeedPosts((prev) =>
       prev.map((item) => {
@@ -52,24 +102,237 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         return item;
       })
     );
+
+    if (activeStoryGroup) {
+      setActiveStoryGroup((prev) =>
+        prev
+          ? prev.map((item) => {
+              if (item.id === postId) {
+                const nextLiked = !item.hasLiked;
+                return {
+                  ...item,
+                  hasLiked: nextLiked,
+                  likes: nextLiked ? item.likes + 1 : Math.max(0, item.likes - 1),
+                };
+              }
+              return item;
+            })
+          : null
+      );
+    }
   };
 
-  const handleSharePost = async (post: CommunityPost) => {
-    try {
-      const activityInfo = post.distance ? `📍 ${post.distance} (${post.pace || 'Atividade'})` : '';
-      const shareMessage = `☕ RunCoffee Clube Campinas\n\n${post.userName} marcou presença no café ${post.cafeName}!\n\n"${post.text}"\n${activityInfo}\n\nJunte-se ao nosso clube de cafés e atividades urbanas!`;
+  // Abrir Gaveta de Comentários
+  const handleOpenComments = (post: CommunityPost) => {
+    setCurrentPostForComments(post);
+    setIsCommentsModalVisible(true);
+  };
 
-      await Share.share({
+  // Enviar Novo Comentário
+  const handleSendComment = () => {
+    if (!newCommentText.trim() || !currentPostForComments) return;
+
+    const newComment: PostComment = {
+      id: `comm-${Date.now()}`,
+      userName,
+      avatar:
+        userAvatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      text: newCommentText.trim(),
+      timeAgo: 'agora mesmo',
+    };
+
+    const updatedComments = [newComment, ...(currentPostForComments.comments || [])];
+
+    setFeedPosts((prev) =>
+      prev.map((p) =>
+        p.id === currentPostForComments.id ? { ...p, comments: updatedComments } : p
+      )
+    );
+
+    setCurrentPostForComments((prev) => (prev ? { ...prev, comments: updatedComments } : null));
+
+    if (activeStoryGroup) {
+      setActiveStoryGroup((prev) =>
+        prev
+          ? prev.map((p) =>
+              p.id === currentPostForComments.id ? { ...p, comments: updatedComments } : p
+            )
+          : null
+      );
+    }
+
+    setNewCommentText('');
+  };
+
+ // Compartilhamento Inteligente (Sem link feio de arquivo local)
+  const handleSmartShare = (post: CommunityPost) => {
+    const activityInfo = post.distance ? `📍 ${post.distance} (${post.pace || 'Rolê Urbano'})\n` : '';
+    const shareMessage = `☕ *RunCoffee Clube Campinas*\n\n*${post.userName}* marcou presença no *${post.cafeName}*!\n\n"${post.text}"\n\n${activityInfo}📲 Baixe o app RunCoffee e venha explorar os cafés especiais de Campinas!`;
+
+    if (post.image) {
+      Alert.alert(
+        'Compartilhar',
+        'Como deseja compartilhar este momento?',
+        [
+          {
+            text: '💬 WhatsApp (Mensagem Formatada)',
+            onPress: async () => {
+              try {
+                // Se for imagem pública da web, podemos manter o link; se for foto do celular (file://), NÃO exibe o caminho
+                const isWebUrl = post.image && post.image.startsWith('http');
+                const textToSend = isWebUrl ? `${shareMessage}\n\n📸 ${post.image}` : shareMessage;
+
+                await Share.share({
+                  title: 'RunCoffee Clube',
+                  message: textToSend,
+                });
+              } catch (e) {
+                console.log(e);
+              }
+            },
+          },
+          {
+            text: '📸 Foto Direta (WhatsApp / Stories)',
+            onPress: async () => {
+              try {
+                let localUri = post.image!;
+                if (post.image!.startsWith('http')) {
+                  const filename = post.image!.split('/').pop()?.split('?')[0] || 'runcoffee.jpg';
+                  const fileUri = `${FileSystem.cacheDirectory}${Date.now()}-${filename}`;
+                  const dl = await FileSystem.downloadAsync(post.image!, fileUri);
+                  localUri = dl.uri;
+                }
+                await Sharing.shareAsync(localUri, {
+                  mimeType: 'image/jpeg',
+                  dialogTitle: 'Enviar Foto para WhatsApp / Stories',
+                });
+              } catch (e) {
+                Share.share({ message: shareMessage });
+              }
+            },
+          },
+          { text: 'Cancelar', style: 'cancel' },
+        ]
+      );
+    } else {
+      Share.share({
         title: 'RunCoffee Clube',
         message: shareMessage,
       });
-    } catch (error) {
-      console.log('Erro ao compartilhar:', error);
+    }
+  };
+
+  // Escolher foto 9:16 da galeria
+  const handlePickStoryImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [9, 16],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0].uri) {
+        setStoryImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      Alert.alert('Erro', 'Não foi possível acessar a galeria de fotos.');
+    }
+  };
+
+  // Publicar o Story
+  const handlePublishStory = () => {
+    if (!storyText.trim() && !storyImageUri) {
+      Alert.alert('Aviso', 'Adicione uma foto ou uma mensagem para o seu story!');
+      return;
+    }
+
+    const finalCafe = isCustomCafe
+      ? customCafeName.trim() || 'Local não cadastrado'
+      : selectedCafeName;
+
+    const newPost: CommunityPost = {
+      id: `story-${Date.now()}`,
+      userName,
+      userHandle: '@voce',
+      avatar:
+        userAvatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      timeAgo: 'agora mesmo',
+      cafeName: finalCafe,
+      text: storyText.trim() || 'Café especial no Clube!',
+      likes: 1,
+      hasLiked: false,
+      distance: 'Check-in',
+      pace: 'Rolê Urbano',
+      image: storyImageUri || undefined,
+      comments: [
+        {
+          id: `c-init-${Date.now()}`,
+          userName: 'Clube RunCoffee',
+          avatar: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=200&q=80',
+          text: 'Boa escolha! Bom café! ☕✨',
+          timeAgo: 'agora mesmo',
+        },
+      ],
+    };
+
+    setFeedPosts([newPost, ...feedPosts]);
+    if (onAddPost) onAddPost(newPost);
+
+    setStoryImageUri(null);
+    setStoryText('');
+    setCustomCafeName('');
+    setIsCustomCafe(false);
+    setIsCreateStoryVisible(false);
+    Alert.alert('Publicado!', 'Seu story foi adicionado à sua caixinha!');
+  };
+
+  // Stories do usuário logado
+  const myStories = feedPosts.filter(
+    (p) => p.userName === userName || p.userHandle === '@voce' || p.id.startsWith('story-')
+  );
+
+  // Stories dos outros membros agrupados
+  const otherUsersMap = new Map<string, CommunityPost[]>();
+  feedPosts.forEach((post) => {
+    const isMe = post.userName === userName || post.userHandle === '@voce' || post.id.startsWith('story-');
+    if (!isMe) {
+      const existing = otherUsersMap.get(post.userName) || [];
+      existing.push(post);
+      otherUsersMap.set(post.userName, existing);
+    }
+  });
+
+  const otherUsersList = Array.from(otherUsersMap.entries()).map(([name, userPosts]) => ({
+    userName: name,
+    avatar: userPosts[0].avatar,
+    stories: userPosts,
+  }));
+
+  const currentStory = activeStoryGroup ? activeStoryGroup[activeStoryIndex] : null;
+
+  const handleNextStory = () => {
+    if (!activeStoryGroup) return;
+    if (activeStoryIndex < activeStoryGroup.length - 1) {
+      setActiveStoryIndex(activeStoryIndex + 1);
+    } else {
+      setActiveStoryGroup(null);
+      setActiveStoryIndex(0);
+    }
+  };
+
+  const handlePrevStory = () => {
+    if (!activeStoryGroup) return;
+    if (activeStoryIndex > 0) {
+      setActiveStoryIndex(activeStoryIndex - 1);
     }
   };
 
   return (
     <View style={styles.container}>
+      {/* Header Fixo */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
           <View>
@@ -82,53 +345,67 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
           </View>
         </View>
 
+        {/* Stories Agrupados */}
         <View style={styles.storiesSection}>
           <Text style={styles.storiesSectionTitle}>Check-ins Recentes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesScroll}>
-            {/* Seu Story */}
-            <TouchableOpacity
-              style={styles.storyItem}
-              activeOpacity={0.8}
-              onPress={() => {
-                const myPost = feedPosts.find((p) => p.userName === userName || p.userHandle === '@voce');
-                if (myPost) {
-                  setActiveStory(myPost);
-                } else if (feedPosts[0]) {
-                  setActiveStory(feedPosts[0]);
-                }
-              }}
-            >
-              <View style={[styles.storyRing, styles.myStoryRing]}>
-                <Image
-                  source={{
-                    uri:
-                      userAvatar ||
-                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-                  }}
-                  style={styles.storyAvatar}
-                />
-                <View style={styles.myStoryPlusBadge}>
-                  <Feather name="plus" size={11} color="#FFF" />
+            {/* Caixinha: Seu Story */}
+            <View style={styles.storyItem}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (myStories.length > 0) {
+                    setActiveStoryGroup(myStories);
+                    setActiveStoryIndex(0);
+                  } else {
+                    setIsCreateStoryVisible(true);
+                  }
+                }}
+              >
+                <View style={[styles.storyRing, myStories.length > 0 ? styles.activeStoryRing : styles.myStoryRing]}>
+                  <Image
+                    source={{
+                      uri:
+                        userAvatar ||
+                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+                    }}
+                    style={styles.storyAvatar}
+                  />
+                  <TouchableOpacity
+                    style={styles.myStoryPlusBadge}
+                    activeOpacity={0.8}
+                    onPress={() => setIsCreateStoryVisible(true)}
+                  >
+                    <Feather name="plus" size={13} color="#FFF" />
+                  </TouchableOpacity>
                 </View>
-              </View>
+              </TouchableOpacity>
               <Text style={styles.storyName} numberOfLines={1}>
-                Seu Story
+                {myStories.length > 0 ? `Você (${myStories.length})` : 'Seu Story'}
               </Text>
-            </TouchableOpacity>
+            </View>
 
             {/* Demais membros */}
-            {feedPosts.map((post) => (
+            {otherUsersList.map((user) => (
               <TouchableOpacity
-                key={`story-${post.id}`}
+                key={`user-story-${user.userName}`}
                 style={styles.storyItem}
                 activeOpacity={0.8}
-                onPress={() => setActiveStory(post)}
+                onPress={() => {
+                  setActiveStoryGroup(user.stories);
+                  setActiveStoryIndex(0);
+                }}
               >
                 <View style={[styles.storyRing, styles.activeStoryRing]}>
-                  <Image source={{ uri: post.avatar }} style={styles.storyAvatar} />
+                  <Image source={{ uri: user.avatar }} style={styles.storyAvatar} />
+                  {user.stories.length > 1 && (
+                    <View style={styles.countBadge}>
+                      <Text style={styles.countBadgeText}>{user.stories.length}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.storyName} numberOfLines={1}>
-                  {(post.userName || 'Membro').split(' ')[0]}
+                  {user.userName.split(' ')[0]}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -136,6 +413,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         </View>
       </View>
 
+      {/* Feed de Posts */}
       <ScrollView contentContainerStyle={styles.feedContent} showsVerticalScrollIndicator={false}>
         {feedPosts.map((item) => (
           <View key={item.id} style={styles.postCard}>
@@ -184,30 +462,37 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               </TouchableOpacity>
             ) : null}
 
+            {/* Ações do Feed */}
             <View style={styles.postActionsRow}>
               <TouchableOpacity
                 style={[styles.actionBtn, item.hasLiked && styles.actionBtnActive]}
                 onPress={() => handleToggleLike(item.id)}
               >
                 <Ionicons
-                  name={item.hasLiked ? 'flame' : 'flame-outline'}
+                  name={item.hasLiked ? 'cafe' : 'cafe-outline'}
                   size={20}
                   color={item.hasLiked ? '#FF6B00' : '#888'}
                 />
                 <Text style={[styles.actionBtnText, item.hasLiked && styles.actionBtnTextActive]}>
-                  {item.likes}
+                  {item.likes} {item.likes === 1 ? 'café' : 'cafés'}
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
-                <Feather name="message-circle" size={18} color="#888" />
-                <Text style={styles.actionBtnText}>Comentar</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.actionBtn}
                 activeOpacity={0.7}
-                onPress={() => handleSharePost(item)}
+                onPress={() => handleOpenComments(item)}
+              >
+                <Feather name="message-circle" size={18} color="#888" />
+                <Text style={styles.actionBtnText}>
+                  {item.comments && item.comments.length > 0 ? item.comments.length : 'Comentar'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                onPress={() => handleSmartShare(item)}
               >
                 <Feather name="share-2" size={18} color="#888" />
                 <Text style={styles.actionBtnText}>Compartilhar</Text>
@@ -217,99 +502,289 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         ))}
       </ScrollView>
 
-      {/* MODAL DE STORIES BLINDADO */}
+      {/* MODAL ADICIONAR AO STORY */}
       <Modal
-        visible={!!activeStory}
+        visible={isCreateStoryVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsCreateStoryVisible(false)}
+      >
+        <View style={styles.createStoryModalBackdrop}>
+          <View style={styles.createStoryModalCard}>
+            <View style={styles.createStoryHeader}>
+              <Text style={styles.createStoryTitle}>Adicionar ao Story</Text>
+              <TouchableOpacity onPress={() => setIsCreateStoryVisible(false)}>
+                <Feather name="x" size={22} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <TouchableOpacity
+                style={styles.photoPickerBox}
+                activeOpacity={0.8}
+                onPress={handlePickStoryImage}
+              >
+                {storyImageUri ? (
+                  <Image source={{ uri: storyImageUri }} style={styles.pickedImagePreview} resizeMode="cover" />
+                ) : (
+                  <View style={styles.photoPickerPlaceholder}>
+                    <Feather name="camera" size={32} color="#FF6B00" />
+                    <Text style={styles.photoPickerText}>Toque para foto vertical (9:16)</Text>
+                    <Text style={styles.photoPickerSub}>1080 x 1920 pixels</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <Text style={styles.inputLabel}>Onde você está tomando esse café?</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cafeChipScroll}>
+                {cafes.map((cafe) => (
+                  <TouchableOpacity
+                    key={cafe.id}
+                    style={[
+                      styles.cafeChip,
+                      !isCustomCafe && selectedCafeName === cafe.name && styles.cafeChipActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedCafeName(cafe.name);
+                      setIsCustomCafe(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.cafeChipText,
+                        !isCustomCafe && selectedCafeName === cafe.name && styles.cafeChipTextActive,
+                      ]}
+                    >
+                      {cafe.name.split(' ')[0]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  style={[styles.cafeChip, isCustomCafe && styles.cafeChipActive]}
+                  onPress={() => setIsCustomCafe(true)}
+                >
+                  <Text style={[styles.cafeChipText, isCustomCafe && styles.cafeChipTextActive]}>
+                    + Outro local
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {isCustomCafe && (
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={styles.inputLabel}>Nome do local ou padaria:</Text>
+                  <TextInput
+                    style={styles.customCafeInput}
+                    placeholder="Ex: Padaria Romana, Café em casa..."
+                    placeholderTextColor="#666"
+                    value={customCafeName}
+                    onChangeText={setCustomCafeName}
+                  />
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>Legenda do momento</Text>
+              <TextInput
+                style={styles.storyTextInput}
+                placeholder="Qual café você está provando hoje?..."
+                placeholderTextColor="#666"
+                value={storyText}
+                onChangeText={setStoryText}
+                multiline
+                numberOfLines={2}
+              />
+
+              <TouchableOpacity style={styles.publishBtn} onPress={handlePublishStory}>
+                <Text style={styles.publishBtnText}>Publicar</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL DE STORIES EM SEQUÊNCIA (FOTO LIMPA SEM POLUIÇÃO VISUAL) */}
+      <Modal
+        visible={!!activeStoryGroup && activeStoryGroup.length > 0}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveStory(null)}
+        onRequestClose={() => setActiveStoryGroup(null)}
       >
         <View style={styles.storyModalOverlay}>
+          {/* BARRINHAS SEGMENTADAS NO TOPO */}
           <View style={styles.storyTopBar}>
-            <View style={styles.storyProgressIndicator} />
+            {activeStoryGroup?.map((_, idx) => (
+              <View
+                key={`progress-${idx}`}
+                style={[
+                  styles.storyProgressSegment,
+                  idx <= activeStoryIndex && styles.storyProgressSegmentActive,
+                ]}
+              />
+            ))}
           </View>
 
+          {/* Cabeçalho */}
           <View style={styles.storyModalHeader}>
             <Image
               source={{
                 uri:
-                  activeStory?.avatar ||
+                  currentStory?.avatar ||
                   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
               }}
               style={styles.storyModalAvatar}
             />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.storyModalUserName}>{activeStory?.userName}</Text>
+              <Text style={styles.storyModalUserName}>{currentStory?.userName}</Text>
               <Text style={styles.storyModalSubtitle}>
-                {activeStory?.cafeName} • {activeStory?.timeAgo}
+                {currentStory?.cafeName} • {currentStory?.timeAgo}
               </Text>
             </View>
             <TouchableOpacity
               style={styles.storyCloseBtn}
-              onPress={() => setActiveStory(null)}
+              onPress={() => setActiveStoryGroup(null)}
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
               <Feather name="x" size={24} color="#FFF" />
             </TouchableOpacity>
           </View>
 
+          {/* Área Central: Foto limpa com zonas de toque para avançar/voltar */}
           <View style={styles.storyMainArea}>
-            {activeStory?.image ? (
+            {currentStory?.image ? (
               <Image
-                source={{ uri: activeStory.image }}
+                source={{ uri: currentStory.image }}
                 style={styles.storyFullImage}
                 resizeMode="cover"
               />
             ) : (
               <View style={styles.storyFallbackContainer}>
-                <Feather name="coffee" size={54} color="#FF6B00" />
-                <Text style={styles.storyFallbackTitle}>{activeStory?.cafeName}</Text>
-                <Text style={styles.storyFallbackText}>"{activeStory?.text}"</Text>
+                <Ionicons name="cafe" size={54} color="#FF6B00" />
+                <Text style={styles.storyFallbackTitle}>{currentStory?.cafeName}</Text>
+                <Text style={styles.storyFallbackText}>"{currentStory?.text}"</Text>
               </View>
             )}
 
+            {/* Zonas de toque para avançar / retroceder */}
+            <TouchableOpacity style={styles.touchLeftZone} onPress={handlePrevStory} activeOpacity={1} />
+            <TouchableOpacity style={styles.touchRightZone} onPress={handleNextStory} activeOpacity={1} />
+
+            {/* Card inferior transparente com o texto do autor e as AÇÕES */}
             <View style={styles.storyBottomCard}>
               <View style={styles.storyBottomCafeRow}>
                 <Feather name="map-pin" size={14} color="#FF6B00" />
-                <Text style={styles.storyBottomCafeName}>{activeStory?.cafeName}</Text>
+                <Text style={styles.storyBottomCafeName}>{currentStory?.cafeName}</Text>
               </View>
 
-              {activeStory?.text ? (
-                <Text style={styles.storyBottomText}>{activeStory.text}</Text>
+              {currentStory?.text ? (
+                <Text style={styles.storyBottomText}>{currentStory.text}</Text>
               ) : null}
 
-              {(activeStory?.distance || activeStory?.pace) && (
-                <View style={styles.storyMetricsRow}>
-                  {activeStory.distance && (
-                    <View style={styles.storyMetricPill}>
-                      <Feather name="navigation" size={12} color="#FFF" />
-                      <Text style={styles.storyMetricPillText}>{activeStory.distance}</Text>
-                    </View>
-                  )}
-                  {activeStory.pace && (
-                    <View style={styles.storyMetricPill}>
-                      <Feather name="activity" size={12} color="#FFD700" />
-                      <Text style={styles.storyMetricPillText}>{activeStory.pace}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
+              {/* BARRA DE AÇÕES: CAFÉS (COM CONTAGEM), COMENTAR E COMPARTILHAR */}
+              <View style={styles.storyActionsRow}>
+                <TouchableOpacity
+                  style={[styles.storyActionBtn, currentStory?.hasLiked && styles.storyActionBtnActive]}
+                  onPress={() => currentStory && handleToggleLike(currentStory.id)}
+                >
+                  <Ionicons
+                    name={currentStory?.hasLiked ? 'cafe' : 'cafe-outline'}
+                    size={22}
+                    color={currentStory?.hasLiked ? '#FF6B00' : '#FFF'}
+                  />
+                  <Text style={[styles.storyActionText, currentStory?.hasLiked && styles.storyActionTextActive]}>
+                    {currentStory?.likes || 0}
+                  </Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.storyFireQuickBtn}
-                activeOpacity={0.8}
-                onPress={() => {
-                  if (activeStory) {
-                    handleToggleLike(activeStory.id);
-                  }
-                }}
-              >
-                <Ionicons name="flame" size={20} color="#FF6B00" />
-                <Text style={styles.storyFireQuickText}>Mandar Fogo 🔥</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.storyActionBtn}
+                  onPress={() => currentStory && handleOpenComments(currentStory)}
+                >
+                  <Feather name="message-circle" size={20} color="#FFF" />
+                  <Text style={styles.storyActionText}>
+                    {currentStory?.comments?.length || 'Comentar'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.storyActionBtn}
+                  onPress={() => currentStory && handleSmartShare(currentStory)}
+                >
+                  <Feather name="share-2" size={20} color="#FFF" />
+                  <Text style={styles.storyActionText}>Compartilhar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* GAVETA DE COMENTÁRIOS (ABRE LIMPA AO CLICAR EM COMENTAR) */}
+      <Modal
+        visible={isCommentsModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsCommentsModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.commentsBackdrop}
+        >
+          <View style={styles.commentsCard}>
+            <View style={styles.commentsHeader}>
+              <View style={styles.commentsHeaderLeft}>
+                <Feather name="message-circle" size={18} color="#FF6B00" />
+                <Text style={styles.commentsTitle}>
+                  Comentários ({currentPostForComments?.comments?.length || 0})
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsCommentsModalVisible(false)}>
+                <Feather name="x" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista de Comentários */}
+            <ScrollView style={styles.commentsList} showsVerticalScrollIndicator={false}>
+              {currentPostForComments?.comments && currentPostForComments.comments.length > 0 ? (
+                currentPostForComments.comments.map((c) => (
+                  <View key={c.id} style={styles.commentItem}>
+                    <Image source={{ uri: c.avatar }} style={styles.commentAvatar} />
+                    <View style={styles.commentContent}>
+                      <View style={styles.commentMetaRow}>
+                        <Text style={styles.commentUserName}>{c.userName}</Text>
+                        <Text style={styles.commentTime}>{c.timeAgo}</Text>
+                      </View>
+                      <Text style={styles.commentText}>{c.text}</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyCommentsBox}>
+                  <Text style={styles.emptyCommentsText}>
+                    Seja o primeiro a mandar um comentário sobre esse café! ☕
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Input para Comentar */}
+            <View style={styles.commentInputRow}>
+              <TextInput
+                style={styles.commentTextInput}
+                placeholder="Escreva um comentário para o membro..."
+                placeholderTextColor="#666"
+                value={newCommentText}
+                onChangeText={setNewCommentText}
+              />
+              <TouchableOpacity
+                style={[styles.sendCommentBtn, !newCommentText.trim() && { opacity: 0.5 }]}
+                disabled={!newCommentText.trim()}
+                onPress={handleSendComment}
+              >
+                <Feather name="send" size={16} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL DE FOTO EM TELA CHEIA */}
@@ -418,7 +893,7 @@ const styles = StyleSheet.create({
     borderColor: '#FF6B00',
   },
   myStoryRing: {
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: '#444',
   },
   storyAvatar: {
@@ -429,16 +904,32 @@ const styles = StyleSheet.create({
   },
   myStoryPlusBadge: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: -1,
+    right: -1,
     backgroundColor: '#FF6B00',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#141414',
+  },
+  countBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FF6B00',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#141414',
+  },
+  countBadgeText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   storyName: {
     color: '#AAA',
@@ -572,20 +1063,151 @@ const styles = StyleSheet.create({
     color: '#FF6B00',
     fontWeight: '700',
   },
+
+  /* MODAL CRIAR STORY */
+  createStoryModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'flex-end',
+  },
+  createStoryModalCard: {
+    backgroundColor: '#181818',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '90%',
+    borderWidth: 1,
+    borderColor: '#303030',
+  },
+  createStoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  createStoryTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  photoPickerBox: {
+    height: 220,
+    width: 124,
+    backgroundColor: '#222',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: '#FF6B00',
+    borderStyle: 'dashed',
+  },
+  photoPickerPlaceholder: {
+    alignItems: 'center',
+    gap: 6,
+    padding: 8,
+  },
+  photoPickerText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  photoPickerSub: {
+    color: '#888',
+    fontSize: 9,
+  },
+  pickedImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  inputLabel: {
+    color: '#AAA',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  cafeChipScroll: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  cafeChip: {
+    backgroundColor: '#242424',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cafeChipActive: {
+    backgroundColor: '#FF6B00',
+    borderColor: '#FF6B00',
+  },
+  cafeChipText: {
+    color: '#AAA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  cafeChipTextActive: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  customCafeInput: {
+    backgroundColor: '#222',
+    color: '#FFF',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  storyTextInput: {
+    backgroundColor: '#222',
+    color: '#FFF',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  publishBtn: {
+    backgroundColor: '#FF6B00',
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  publishBtnText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+
+  /* MODAL DE STORIES EM SEQUÊNCIA */
   storyModalOverlay: {
     flex: 1,
     backgroundColor: '#000',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 44,
   },
   storyTopBar: {
+    flexDirection: 'row',
+    gap: 4,
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  storyProgressIndicator: {
+  storyProgressSegment: {
+    flex: 1,
     height: 2.5,
-    backgroundColor: '#FF6B00',
+    backgroundColor: 'rgba(255,255,255,0.3)',
     borderRadius: 2,
-    width: '100%',
+  },
+  storyProgressSegmentActive: {
+    backgroundColor: '#FF6B00',
   },
   storyModalHeader: {
     flexDirection: 'row',
@@ -654,19 +1276,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
+  touchLeftZone: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width * 0.4,
+    height: '70%',
+    zIndex: 5,
+  },
+  touchRightZone: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: width * 0.6,
+    height: '70%',
+    zIndex: 5,
+  },
   storyBottomCard: {
-    backgroundColor: 'rgba(15,15,15,0.85)',
-    padding: 18,
+    backgroundColor: 'rgba(15,15,15,0.88)',
+    padding: 16,
     margin: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
+    zIndex: 10,
   },
   storyBottomCafeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   storyBottomCafeName: {
     color: '#FF6B00',
@@ -677,43 +1316,151 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 10,
-  },
-  storyMetricsRow: {
-    flexDirection: 'row',
-    gap: 8,
     marginBottom: 12,
   },
-  storyMetricPill: {
+  storyActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#262626',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    justifyContent: 'space-around',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.12)',
   },
-  storyMetricPillText: {
+  storyActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  storyActionBtnActive: {
+    backgroundColor: 'rgba(255,107,0,0.15)',
+    borderRadius: 10,
+  },
+  storyActionText: {
     color: '#FFF',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
   },
-  storyFireQuickBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(255,107,0,0.2)',
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FF6B00',
-  },
-  storyFireQuickText: {
-    color: '#FFF',
-    fontSize: 14,
+  storyActionTextActive: {
+    color: '#FF6B00',
     fontWeight: '700',
   },
+
+  /* MODAL DE COMENTÁRIOS */
+  commentsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'flex-end',
+  },
+  commentsCard: {
+    backgroundColor: '#181818',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingHorizontal: 18,
+    paddingBottom: Platform.OS === 'android' ? 20 : 36,
+    maxHeight: '75%',
+    borderWidth: 1,
+    borderColor: '#303030',
+  },
+  commentsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#262626',
+    marginBottom: 12,
+  },
+  commentsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commentsTitle: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  commentsList: {
+    maxHeight: 320,
+  },
+  commentItem: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  commentAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#262626',
+  },
+  commentContent: {
+    marginLeft: 10,
+    flex: 1,
+    backgroundColor: '#222',
+    padding: 10,
+    borderRadius: 12,
+  },
+  commentMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  commentUserName: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  commentTime: {
+    color: '#777',
+    fontSize: 11,
+  },
+  commentText: {
+    color: '#DDD',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  emptyCommentsBox: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyCommentsText: {
+    color: '#777',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#262626',
+  },
+  commentTextInput: {
+    flex: 1,
+    backgroundColor: '#222',
+    color: '#FFF',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  sendCommentBtn: {
+    backgroundColor: '#FF6B00',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  /* VIEWER FOTO CHEIA */
   imageViewerBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.95)',
