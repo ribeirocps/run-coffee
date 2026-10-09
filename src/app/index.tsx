@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 // Módulos organizados
@@ -38,7 +39,8 @@ import { CommunityTab } from '../components/CommunityTab';
 import { ProfileTab } from '../components/ProfileTab';
 
 export default function RunCoffeeApp() {
-  const [activeTab, setActiveTab] = useState<'mapa' | 'circuitos' | 'comunidade' | 'perfil'>('mapa');
+  const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<'mapa' | 'circuitos' | 'clube' | 'perfil'>('mapa');
 
   // Perfil e Estatísticas
   const [userName, setUserName] = useState('Corredor Urbano');
@@ -340,7 +342,7 @@ export default function RunCoffeeApp() {
     const updated = [newPost, ...communityPosts];
     setCommunityPosts(updated);
     savePostsToStorage(updated);
-    Alert.alert('Sucesso! 🎉', 'Seu check-in foi publicado no Feed da Comunidade!');
+    Alert.alert('Sucesso! 🎉', 'Seu check-in foi publicado no Feed da Clube!');
   };
 
   const updateCircuitsProgress = (cafe: Cafe) => {
@@ -476,7 +478,7 @@ export default function RunCoffeeApp() {
     setPostDistance('');
     setPostPhoto(null);
     setIsPostModalVisible(false);
-    Alert.alert('Publicado! 🎉', 'Seu relato está salvo e visível no feed da comunidade!');
+    Alert.alert('Publicado! 🎉', 'Seu relato está salvo e visível no feed da clube!');
   };
 
   const handleToggleCheer = (postId: string) => {
@@ -813,7 +815,7 @@ export default function RunCoffeeApp() {
           <CircuitsTab circuits={circuits} onNavigateToMap={() => setActiveTab('mapa')} />
         )}
 
-        {activeTab === 'comunidade' && (
+        {activeTab === 'clube' && (
           <CommunityTab
             posts={communityPosts}
             onToggleCheer={handleToggleCheer}
@@ -864,13 +866,13 @@ export default function RunCoffeeApp() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('comunidade')}>
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('clube')}>
           <Feather
             name="users"
             size={20}
-            color={activeTab === 'comunidade' ? '#FC4C02' : '#737373'}
+            color={activeTab === 'clube' ? '#FC4C02' : '#737373'}
           />
-          <Text style={[styles.tabLabel, activeTab === 'comunidade' && styles.tabLabelActive]}>
+          <Text style={[styles.tabLabel, activeTab === 'clube' && styles.tabLabelActive]}>
             Clube
           </Text>
         </TouchableOpacity>

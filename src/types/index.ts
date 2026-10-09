@@ -1,41 +1,61 @@
 export interface Cafe {
   id: string;
   name: string;
+  address: string;
   lat: number;
   lng: number;
-  address: string;
-  neighborhood: string;
-  currentKing: string;
-  kingVisits: number;
-  kingAvatar?: string;
-  perk: string;
-  distanceKm: number;
-  isPartner: boolean;
+  distanceKm?: number;
+  king?: string;
+  currentKing?: string;
+  rei?: string;
+  kingCheckins?: number;
+  kingVisits?: number; // <-- ADICIONE ESTA LINHA AQUI
+  visitsCount?: number;
+  activePerk?: string;
+  perkDurationSeconds?: number;
+  perkEligibleMinVisits?: number;
+  rating?: number;
+  photoUrl?: string;
+  tags?: string[];
+  [key: string]: any;
 }
 
 export interface Circuit {
   id: string;
-  title: string;
-  distance: string;
+  title?: string;
+  name?: string;
   description: string;
-  cafes: string[];
-  visitedCafes: string[];
-  badgeAwarded: string;
-  completed: boolean;
+  totalDistanceKm?: number;
+  distanceKm?: number;
+  distance?: string;
+  rewardPoints?: number;
+  points?: number;
+  badgeIcon?: string;
+  badge?: string;
+  region?: string;
+  cafes: any[];
+  completed?: boolean;
+  [key: string]: any;
 }
 
 export interface CommunityPost {
   id: string;
   userName: string;
-  userLevel?: string;
+  userHandle?: string;
   avatar: string;
-  avatarUrl?: string;
   timeAgo: string;
   cafeName: string;
-  distanceKm?: string;
-  durationMin?: string;
   text: string;
-  photo: string | null;
-  cheers: number;
-  hasCheered: boolean;
+  likes: number;
+  hasLiked?: boolean;
+  pace?: string;
+  distance?: string;
+  elevation?: string;
+  image?: string;
+  comments?: number;
+  commentsCount?: number;
+  [key: string]: any;
 }
+
+export type ClubPost = CommunityPost;
+export type ClubePost = CommunityPost;

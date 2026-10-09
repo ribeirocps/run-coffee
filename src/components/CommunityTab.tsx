@@ -3,639 +3,734 @@ import React, { useState } from 'react';
 import {
   Image,
   Modal,
+  Platform,
   ScrollView,
+  Share,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { INITIAL_CAFES } from '../data/initialData';
-import { Cafe, CommunityPost } from '../types';
+import { CommunityPost } from '../types';
 
 interface CommunityTabProps {
-  cafes?: Cafe[];
-  posts: CommunityPost[];
-  onToggleCheer: (postId: string) => void;
-  onOpenPostModal: () => void;
-  isRunClubJoined?: boolean;
-  onToggleRunClub?: () => void;
+  posts?: CommunityPost[] | any;
+  onAddPost?: (post: any) => void;
+  onLikePost?: (postId: string) => void;
+  onOpenCreatePost?: () => void;
+  userAvatar?: string;
+  userName?: string;
+  [key: string]: any;
 }
 
-export const CommunityTab: React.FC<CommunityTabProps> = ({
-  cafes = INITIAL_CAFES,
-  posts,
-  onToggleCheer,
-  onOpenPostModal,
-}) => {
-  const [selectedStory, setSelectedStory] = useState<CommunityPost | null>(null);
+const TOP_SAFE_PADDING =
+  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 52;
 
-  // Retorna a cor e o ícone do nível do atleta
-  const getLevelBadgeInfo = (level?: string) => {
-    if (level === 'Master Coffee Lover') {
-      return { color: '#FC4C02', bg: 'rgba(252, 76, 2, 0.12)', icon: 'ribbon' };
+export const CommunityTab: React.FC<CommunityTabProps> = ({
+  posts = [],
+  onAddPost,
+  userAvatar,
+  userName = 'Você',
+}) => {
+  const initialList: CommunityPost[] = Array.isArray(posts) ? posts : [];
+  const [feedPosts, setFeedPosts] = useState<CommunityPost[]>(initialList);
+  const [activeStory, setActiveStory] = useState<CommunityPost | null>(null);
+  const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
+
+  const handleToggleLike = (postId: string) => {
+    setFeedPosts((prev) =>
+      prev.map((item) => {
+        if (item.id === postId) {
+          const nextLiked = !item.hasLiked;
+          return {
+            ...item,
+            hasLiked: nextLiked,
+            likes: nextLiked ? item.likes + 1 : Math.max(0, item.likes - 1),
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleSharePost = async (post: CommunityPost) => {
+    try {
+      const activityInfo = post.distance ? `📍 ${post.distance} (${post.pace || 'Atividade'})` : '';
+      const shareMessage = `☕ RunCoffee Clube Campinas\n\n${post.userName} marcou presença no café ${post.cafeName}!\n\n"${post.text}"\n${activityInfo}\n\nJunte-se ao nosso clube de cafés e atividades urbanas!`;
+
+      await Share.share({
+        title: 'RunCoffee Clube',
+        message: shareMessage,
+      });
+    } catch (error) {
+      console.log('Erro ao compartilhar:', error);
     }
-    if (level === 'Rei da Casa') {
-      return { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)', icon: 'trophy' };
-    }
-    if (level === 'Coffee Hunter') {
-      return { color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)', icon: 'compass' };
-    }
-    return { color: '#A1A1AA', bg: 'rgba(161, 161, 170, 0.12)', icon: 'coffee' };
   };
 
   return (
-    <ScrollView style={styles.tabContainer} contentContainerStyle={{ paddingBottom: 30 }}>
-      {/* 1. CARROSSEL DE STORIES: ÚLTIMOS CHECK-INS */}
-      <View style={styles.storiesSection}>
-        <View style={styles.storiesHeader}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={styles.liveDot} />
-            <Text style={styles.storiesSectionTitle}>CHECK-INS RECENTES</Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <View>
+            <View style={styles.clubBadge}>
+              <Feather name="coffee" size={13} color="#FF6B00" />
+              <Text style={styles.clubBadgeText}>CLUBE RUNCOFFEE</Text>
+            </View>
+            <Text style={styles.title}>Feed do Clube</Text>
+            <Text style={styles.subtitle}>Check-ins, treinos e rolês de café em Campinas</Text>
           </View>
-          <Text style={styles.storiesSectionBadge}>CAMPINAS AO VIVO</Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.storiesScroll}
-        >
-          {/* Círculo 1: Seu Próprio Check-in / Postar */}
-          <TouchableOpacity
-            style={styles.storyItem}
-            activeOpacity={0.8}
-            onPress={onOpenPostModal}
-          >
-            <View style={styles.yourStoryRing}>
-              <View style={styles.yourStoryInner}>
-                <Feather name="plus" size={22} color="#FC4C02" />
-              </View>
-            </View>
-            <Text style={styles.yourStoryLabel} numberOfLines={1}>
-              Seu Check-in
-            </Text>
-            <Text style={styles.storySubLabel}>Postar</Text>
-          </TouchableOpacity>
-
-          {/* Círculos 2+: Os últimos check-ins da comunidade */}
-          {posts.map((post) => (
+        <View style={styles.storiesSection}>
+          <Text style={styles.storiesSectionTitle}>Check-ins Recentes</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesScroll}>
+            {/* Seu Story */}
             <TouchableOpacity
-              key={post.id}
               style={styles.storyItem}
               activeOpacity={0.8}
-              onPress={() => setSelectedStory(post)}
+              onPress={() => {
+                const myPost = feedPosts.find((p) => p.userName === userName || p.userHandle === '@voce');
+                if (myPost) {
+                  setActiveStory(myPost);
+                } else if (feedPosts[0]) {
+                  setActiveStory(feedPosts[0]);
+                }
+              }}
             >
-              <View style={styles.storyRing}>
-                {post.avatarUrl ? (
-                  <Image source={{ uri: post.avatarUrl }} style={styles.storyAvatarImage} />
-                ) : (
-                  <View style={styles.storyAvatarFallback}>
-                    <Text style={styles.storyAvatarText}>
-                      {post.userName.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.storyCoffeeBadge}>
-                  <Feather name="coffee" size={9} color="#FFF" />
+              <View style={[styles.storyRing, styles.myStoryRing]}>
+                <Image
+                  source={{
+                    uri:
+                      userAvatar ||
+                      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+                  }}
+                  style={styles.storyAvatar}
+                />
+                <View style={styles.myStoryPlusBadge}>
+                  <Feather name="plus" size={11} color="#FFF" />
                 </View>
               </View>
-
-              <Text style={styles.storyUserName} numberOfLines={1}>
-                {post.userName.split(' ')[0]}
-              </Text>
-              <Text style={styles.storyCafeShort} numberOfLines={1}>
-                {post.cafeName.split(' ')[0]}
+              <Text style={styles.storyName} numberOfLines={1}>
+                Seu Story
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
 
-      <View style={{ paddingHorizontal: 16 }}>
-        {/* 2. BOTÃO DE POSTAR */}
-        <TouchableOpacity style={styles.postActionButton} onPress={onOpenPostModal}>
-          <Feather name="edit-3" size={17} color="#FFF" style={{ marginRight: 8 }} />
-          <Text style={styles.postActionButtonText}>
-            Compartilhar Treino ou Café
-          </Text>
-        </TouchableOpacity>
-
-        {/* 3. FEED SOCIAL COM MÉTRICAS E NÍVEIS */}
-        <Text style={styles.sectionHeading}>FEED DE ATIVIDADES</Text>
-
-        {posts.map((post) => {
-          const badge = getLevelBadgeInfo(post.userLevel);
-
-          return (
-            <View key={post.id} style={styles.postCard}>
-              {/* Topo do Post: Foto, Nome e Selo de Nível */}
-              <View style={styles.postHeader}>
-                {post.avatarUrl ? (
-                  <Image source={{ uri: post.avatarUrl }} style={styles.postAvatarImage} />
-                ) : (
-                  <View style={styles.postAvatarBox}>
-                    <Text style={{ fontSize: 16 }}>{post.avatar}</Text>
-                  </View>
-                )}
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={styles.postAuthor}>{post.userName}</Text>
-                    {post.userLevel && (
-                      <View style={[styles.userLevelTag, { backgroundColor: badge.bg, borderColor: badge.color }]}>
-                        <Ionicons name={badge.icon as any} size={10} color={badge.color} style={{ marginRight: 3 }} />
-                        <Text style={[styles.userLevelTagText, { color: badge.color }]}>
-                          {post.userLevel}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.postSubRow}>
-                    <Text style={styles.postTime}>{post.timeAgo}</Text>
-                    <Text style={styles.postDot}>•</Text>
-                    <View style={styles.cafeTagPill}>
-                      <Feather name="coffee" size={11} color="#FC4C02" style={{ marginRight: 3 }} />
-                      <Text style={styles.cafeTagText}>{post.cafeName}</Text>
-                    </View>
-                  </View>
+            {/* Demais membros */}
+            {feedPosts.map((post) => (
+              <TouchableOpacity
+                key={`story-${post.id}`}
+                style={styles.storyItem}
+                activeOpacity={0.8}
+                onPress={() => setActiveStory(post)}
+              >
+                <View style={[styles.storyRing, styles.activeStoryRing]}>
+                  <Image source={{ uri: post.avatar }} style={styles.storyAvatar} />
                 </View>
-              </View>
-
-              {/* Pílulas de Métricas de Treino (Distância & Duração) */}
-              {(post.distanceKm || post.durationMin) && (
-                <View style={styles.metricsRow}>
-                  {post.distanceKm && (
-                    <View style={styles.metricPill}>
-                      <Feather name="trending-up" size={11} color="#FC4C02" style={{ marginRight: 4 }} />
-                      <Text style={styles.metricPillText}>{post.distanceKm}</Text>
-                    </View>
-                  )}
-                  {post.durationMin && (
-                    <View style={styles.metricPill}>
-                      <Feather name="clock" size={11} color="#A1A1AA" style={{ marginRight: 4 }} />
-                      <Text style={styles.metricPillText}>{post.durationMin}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Texto do Post */}
-              <Text style={styles.postText}>{post.text}</Text>
-
-              {/* Foto anexada */}
-              {post.photo && (
-                <Image source={{ uri: post.photo }} style={styles.postImage} />
-              )}
-
-              {/* Rodapé com Brinde */}
-              <View style={styles.postFooter}>
-                <TouchableOpacity
-                  style={[
-                    styles.cheerButton,
-                    post.hasCheered && styles.cheerButtonActive,
-                  ]}
-                  onPress={() => onToggleCheer(post.id)}
-                >
-                  <Ionicons
-                    name={post.hasCheered ? 'flame' : 'flame-outline'}
-                    size={16}
-                    color={post.hasCheered ? '#FC4C02' : '#A3A3A3'}
-                  />
-                  <Text
-                    style={[
-                      styles.cheerButtonText,
-                      post.hasCheered && styles.cheerButtonTextActive,
-                    ]}
-                  >
-                    {post.hasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheers})
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* MODAL STORY */}
-      <Modal
-        visible={!!selectedStory}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setSelectedStory(null)}
-      >
-        <View style={styles.storyModalOverlay}>
-          <View style={styles.storyModalCard}>
-            <View style={styles.storyModalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                {selectedStory?.avatarUrl ? (
-                  <Image source={{ uri: selectedStory.avatarUrl }} style={{ width: 36, height: 36, borderRadius: 18 }} />
-                ) : (
-                  <View style={styles.storyAvatarFallback}>
-                    <Text style={{ color: '#FFF', fontWeight: 'bold' }}>
-                      {selectedStory?.userName.charAt(0)}
-                    </Text>
-                  </View>
-                )}
-                <View>
-                  <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
-                    {selectedStory?.userName}
-                  </Text>
-                  <Text style={{ color: '#FC4C02', fontSize: 11, fontWeight: '600' }}>
-                    {selectedStory?.cafeName} • {selectedStory?.timeAgo}
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setSelectedStory(null)} style={{ padding: 4 }}>
-                <Feather name="x" size={22} color="#FFF" />
+                <Text style={styles.storyName} numberOfLines={1}>
+                  {(post.userName || 'Membro').split(' ')[0]}
+                </Text>
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.feedContent} showsVerticalScrollIndicator={false}>
+        {feedPosts.map((item) => (
+          <View key={item.id} style={styles.postCard}>
+            <View style={styles.postHeader}>
+              <Image source={{ uri: item.avatar }} style={styles.postAvatar} />
+              <View style={styles.postAuthorInfo}>
+                <Text style={styles.postAuthorName}>{item.userName}</Text>
+                <View style={styles.postSubRow}>
+                  <Feather name="map-pin" size={12} color="#FF6B00" />
+                  <Text style={styles.postCafeName}>{item.cafeName}</Text>
+                  <Text style={styles.postDot}>•</Text>
+                  <Text style={styles.postTime}>{item.timeAgo}</Text>
+                </View>
+              </View>
             </View>
 
-            {selectedStory?.photo ? (
-              <Image source={{ uri: selectedStory.photo }} style={styles.storyModalPhoto} />
-            ) : (
-              <View style={styles.storyModalPhotoPlaceholder}>
-                <Feather name="coffee" size={48} color="#52525B" />
-                <Text style={{ color: '#71717A', fontSize: 13, marginTop: 8 }}>Check-in sem foto anexada</Text>
+            <Text style={styles.postText}>{item.text}</Text>
+
+            {(item.distance || item.pace) && (
+              <View style={styles.activityBadgeRow}>
+                {item.distance && (
+                  <View style={styles.activityBadge}>
+                    <Feather name="navigation" size={12} color="#FF6B00" />
+                    <Text style={styles.activityBadgeText}>{item.distance}</Text>
+                  </View>
+                )}
+                {item.pace && (
+                  <View style={styles.activityBadge}>
+                    <Feather name="activity" size={12} color="#FFD700" />
+                    <Text style={styles.activityBadgeText}>{item.pace}</Text>
+                  </View>
+                )}
               </View>
             )}
 
-            <View style={{ padding: 16 }}>
-              {/* Métricas no Story */}
-              {(selectedStory?.distanceKm || selectedStory?.durationMin) && (
-                <View style={[styles.metricsRow, { marginBottom: 10 }]}>
-                  {selectedStory.distanceKm && (
-                    <View style={styles.metricPill}>
-                      <Feather name="trending-up" size={11} color="#FC4C02" style={{ marginRight: 4 }} />
-                      <Text style={styles.metricPillText}>{selectedStory.distanceKm}</Text>
+            {item.image ? (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => setEnlargedImage(item.image || null)}
+                style={styles.postImageContainer}
+              >
+                <Image source={{ uri: item.image }} style={styles.postImage} resizeMode="cover" />
+                <View style={styles.expandHint}>
+                  <Feather name="maximize-2" size={14} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={styles.postActionsRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, item.hasLiked && styles.actionBtnActive]}
+                onPress={() => handleToggleLike(item.id)}
+              >
+                <Ionicons
+                  name={item.hasLiked ? 'flame' : 'flame-outline'}
+                  size={20}
+                  color={item.hasLiked ? '#FF6B00' : '#888'}
+                />
+                <Text style={[styles.actionBtnText, item.hasLiked && styles.actionBtnTextActive]}>
+                  {item.likes}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+                <Feather name="message-circle" size={18} color="#888" />
+                <Text style={styles.actionBtnText}>Comentar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.actionBtn}
+                activeOpacity={0.7}
+                onPress={() => handleSharePost(item)}
+              >
+                <Feather name="share-2" size={18} color="#888" />
+                <Text style={styles.actionBtnText}>Compartilhar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+      {/* MODAL DE STORIES BLINDADO */}
+      <Modal
+        visible={!!activeStory}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveStory(null)}
+      >
+        <View style={styles.storyModalOverlay}>
+          <View style={styles.storyTopBar}>
+            <View style={styles.storyProgressIndicator} />
+          </View>
+
+          <View style={styles.storyModalHeader}>
+            <Image
+              source={{
+                uri:
+                  activeStory?.avatar ||
+                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+              }}
+              style={styles.storyModalAvatar}
+            />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.storyModalUserName}>{activeStory?.userName}</Text>
+              <Text style={styles.storyModalSubtitle}>
+                {activeStory?.cafeName} • {activeStory?.timeAgo}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.storyCloseBtn}
+              onPress={() => setActiveStory(null)}
+              hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            >
+              <Feather name="x" size={24} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.storyMainArea}>
+            {activeStory?.image ? (
+              <Image
+                source={{ uri: activeStory.image }}
+                style={styles.storyFullImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.storyFallbackContainer}>
+                <Feather name="coffee" size={54} color="#FF6B00" />
+                <Text style={styles.storyFallbackTitle}>{activeStory?.cafeName}</Text>
+                <Text style={styles.storyFallbackText}>"{activeStory?.text}"</Text>
+              </View>
+            )}
+
+            <View style={styles.storyBottomCard}>
+              <View style={styles.storyBottomCafeRow}>
+                <Feather name="map-pin" size={14} color="#FF6B00" />
+                <Text style={styles.storyBottomCafeName}>{activeStory?.cafeName}</Text>
+              </View>
+
+              {activeStory?.text ? (
+                <Text style={styles.storyBottomText}>{activeStory.text}</Text>
+              ) : null}
+
+              {(activeStory?.distance || activeStory?.pace) && (
+                <View style={styles.storyMetricsRow}>
+                  {activeStory.distance && (
+                    <View style={styles.storyMetricPill}>
+                      <Feather name="navigation" size={12} color="#FFF" />
+                      <Text style={styles.storyMetricPillText}>{activeStory.distance}</Text>
                     </View>
                   )}
-                  {selectedStory.durationMin && (
-                    <View style={styles.metricPill}>
-                      <Feather name="clock" size={11} color="#A1A1AA" style={{ marginRight: 4 }} />
-                      <Text style={styles.metricPillText}>{selectedStory.durationMin}</Text>
+                  {activeStory.pace && (
+                    <View style={styles.storyMetricPill}>
+                      <Feather name="activity" size={12} color="#FFD700" />
+                      <Text style={styles.storyMetricPillText}>{activeStory.pace}</Text>
                     </View>
                   )}
                 </View>
               )}
 
-              <Text style={{ color: '#E4E4E7', fontSize: 14, lineHeight: 20 }}>
-                {selectedStory?.text}
-              </Text>
-
               <TouchableOpacity
-                style={[
-                  styles.storyCheerBtn,
-                  selectedStory?.hasCheered && { backgroundColor: '#FC4C02' },
-                ]}
+                style={styles.storyFireQuickBtn}
+                activeOpacity={0.8}
                 onPress={() => {
-                  if (selectedStory) {
-                    onToggleCheer(selectedStory.id);
-                    setSelectedStory((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            hasCheered: !prev.hasCheered,
-                            cheers: !prev.hasCheered ? prev.cheers + 1 : prev.cheers - 1,
-                          }
-                        : null
-                    );
+                  if (activeStory) {
+                    handleToggleLike(activeStory.id);
                   }
                 }}
               >
-                <Ionicons name="flame" size={18} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>
-                  {selectedStory?.hasCheered ? 'Brindado!' : 'Brinde! ☕'} ({selectedStory?.cheers})
-                </Text>
+                <Ionicons name="flame" size={20} color="#FF6B00" />
+                <Text style={styles.storyFireQuickText}>Mandar Fogo 🔥</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </ScrollView>
+
+      {/* MODAL DE FOTO EM TELA CHEIA */}
+      <Modal
+        visible={!!enlargedImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEnlargedImage(null)}
+      >
+        <View style={styles.imageViewerBackdrop}>
+          <TouchableOpacity
+            style={styles.imageViewerCloseBtn}
+            onPress={() => setEnlargedImage(null)}
+            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+          >
+            <Feather name="x" size={28} color="#FFF" />
+          </TouchableOpacity>
+          {enlargedImage ? (
+            <Image
+              source={{ uri: enlargedImage }}
+              style={styles.imageViewerContent}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  tabContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
   },
-  storiesSection: {
-    paddingVertical: 14,
+  header: {
+    paddingTop: TOP_SAFE_PADDING,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: '#141414',
     borderBottomWidth: 1,
-    borderBottomColor: '#1A1A1A',
-    marginBottom: 16,
+    borderBottomColor: '#222',
   },
-  storiesHeader: {
+  headerTitleRow: {
+    marginBottom: 10,
+  },
+  clubBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    gap: 6,
+    backgroundColor: 'rgba(255,107,0,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,0,0.3)',
+    alignSelf: 'flex-start',
+    marginBottom: 6,
   },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  storiesSectionTitle: {
+  clubBadgeText: {
+    color: '#FF6B00',
     fontSize: 11,
     fontWeight: '800',
-    color: '#E5E5E5',
-    letterSpacing: 1,
-  },
-  storiesSectionBadge: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#FC4C02',
     letterSpacing: 0.8,
   },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#8E8E8E',
+    marginTop: 2,
+  },
+  storiesSection: {
+    marginTop: 8,
+  },
+  storiesSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#777',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
   storiesScroll: {
-    paddingHorizontal: 14,
-    gap: 14,
+    flexDirection: 'row',
   },
   storyItem: {
     alignItems: 'center',
+    marginRight: 14,
     width: 64,
   },
-  yourStoryRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    borderWidth: 2,
-    borderColor: '#3F3F46',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#18181B',
-  },
-  yourStoryInner: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  yourStoryLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FC4C02',
-    marginTop: 6,
-    textAlign: 'center',
-  },
   storyRing: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    borderWidth: 2.5,
-    borderColor: '#FC4C02',
-    padding: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-    backgroundColor: '#0D0D0D',
-  },
-  storyAvatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 28,
-  },
-  storyAvatarFallback: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 28,
-    backgroundColor: '#27272A',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    padding: 2.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  storyAvatarText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: 'bold',
+  activeStoryRing: {
+    borderWidth: 2,
+    borderColor: '#FF6B00',
   },
-  storyCoffeeBadge: {
+  myStoryRing: {
+    borderWidth: 1.5,
+    borderColor: '#444',
+  },
+  storyAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#222',
+  },
+  myStoryPlusBadge: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#FC4C02',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#FF6B00',
     width: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#0D0D0D',
+    borderWidth: 2,
+    borderColor: '#141414',
   },
-  storyUserName: {
+  storyName: {
+    color: '#AAA',
     fontSize: 11,
-    fontWeight: '700',
-    color: '#E5E5E5',
-    marginTop: 6,
+    fontWeight: '500',
+    marginTop: 4,
     textAlign: 'center',
   },
-  storyCafeShort: {
-    fontSize: 10,
-    color: '#71717A',
-    textAlign: 'center',
-  },
-  storySubLabel: {
-    fontSize: 10,
-    color: '#71717A',
-  },
-  postActionButton: {
-    backgroundColor: '#27272A',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-  },
-  postActionButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  sectionHeading: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#71717A',
-    letterSpacing: 1.2,
-    marginBottom: 12,
+  feedContent: {
+    padding: 16,
+    paddingBottom: 110,
   },
   postCard: {
-    backgroundColor: '#18181B',
-    borderRadius: 18,
+    backgroundColor: '#181818',
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 14,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: '#262626',
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  postAvatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  postAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#262626',
   },
-  postAvatarBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#27272A',
-    justifyContent: 'center',
-    alignItems: 'center',
+  postAuthorInfo: {
+    marginLeft: 12,
+    flex: 1,
   },
-  postAuthor: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  postAuthorName: {
     color: '#FFF',
-  },
-  userLevelTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 1.5,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  userLevelTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    fontSize: 15,
+    fontWeight: '700',
   },
   postSubRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
     marginTop: 2,
-    gap: 6,
   },
-  postTime: {
-    fontSize: 11,
-    color: '#71717A',
-  },
-  postDot: {
-    color: '#3F3F46',
-    fontSize: 10,
-  },
-  cafeTagPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(252, 76, 2, 0.1)',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-  },
-  cafeTagText: {
-    color: '#FC4C02',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  metricPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27272A',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  metricPillText: {
-    color: '#E4E4E7',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  postText: {
-    fontSize: 14,
-    color: '#E4E4E7',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  postImage: {
-    width: '100%',
-    height: 190,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
-  postFooter: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#27272A',
-    paddingTop: 10,
-  },
-  cheerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: '#27272A',
-  },
-  cheerButtonActive: {
-    backgroundColor: 'rgba(252, 76, 2, 0.15)',
-  },
-  cheerButtonText: {
-    color: '#A1A1AA',
+  postCafeName: {
+    color: '#FF6B00',
     fontSize: 12,
     fontWeight: '600',
   },
-  cheerButtonTextActive: {
-    color: '#FC4C02',
-    fontWeight: 'bold',
+  postDot: {
+    color: '#555',
+    fontSize: 12,
+  },
+  postTime: {
+    color: '#777',
+    fontSize: 12,
+  },
+  postText: {
+    color: '#E0E0E0',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  activityBadgeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  activityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#242424',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  activityBadgeText: {
+    color: '#DDD',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  postImageContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  postImage: {
+    width: '100%',
+    height: 220,
+    backgroundColor: '#222',
+  },
+  expandHint: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    padding: 6,
+    borderRadius: 14,
+  },
+  postActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#242424',
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  actionBtnActive: {
+    backgroundColor: 'rgba(255,107,0,0.1)',
+    borderRadius: 8,
+  },
+  actionBtnText: {
+    color: '#888',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  actionBtnTextActive: {
+    color: '#FF6B00',
+    fontWeight: '700',
   },
   storyModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    padding: 16,
+    backgroundColor: '#000',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 10 : 44,
   },
-  storyModalCard: {
-    backgroundColor: '#18181B',
-    borderRadius: 24,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    maxHeight: '85%',
+  storyTopBar: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  storyProgressIndicator: {
+    height: 2.5,
+    backgroundColor: '#FF6B00',
+    borderRadius: 2,
+    width: '100%',
   },
   storyModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    zIndex: 10,
   },
-  storyModalPhoto: {
-    width: '100%',
-    height: 280,
-    backgroundColor: '#0D0D0D',
+  storyModalAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: '#FF6B00',
   },
-  storyModalPhotoPlaceholder: {
+  storyModalUserName: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  storyModalSubtitle: {
+    color: '#BBB',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  storyCloseBtn: {
+    padding: 6,
+  },
+  storyMainArea: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'flex-end',
+  },
+  storyFullImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
-    height: 200,
+    height: '100%',
+  },
+  storyFallbackContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#181818',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#121212',
+    padding: 24,
   },
-  storyCheerBtn: {
-    backgroundColor: '#27272A',
+  storyFallbackTitle: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  storyFallbackText: {
+    color: '#CCC',
+    fontSize: 15,
+    fontStyle: 'italic',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  storyBottomCard: {
+    backgroundColor: 'rgba(15,15,15,0.85)',
+    padding: 18,
+    margin: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  storyBottomCafeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  storyBottomCafeName: {
+    color: '#FF6B00',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  storyBottomText: {
+    color: '#FFF',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  storyMetricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  storyMetricPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#262626',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  storyMetricPillText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  storyFireQuickBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 14,
-    marginTop: 14,
+    gap: 8,
+    backgroundColor: 'rgba(255,107,0,0.2)',
+    paddingVertical: 10,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#3F3F46',
+    borderColor: '#FF6B00',
+  },
+  storyFireQuickText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  imageViewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerCloseBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 52,
+    right: 20,
+    zIndex: 20,
+    backgroundColor: 'rgba(40,40,40,0.8)',
+    padding: 8,
+    borderRadius: 22,
+  },
+  imageViewerContent: {
+    width: '100%',
+    height: '80%',
   },
 });

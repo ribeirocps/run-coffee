@@ -1,386 +1,420 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import {
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Circuit } from '../types';
 
 interface CircuitsTabProps {
-  circuits: Circuit[];
-  onNavigateToMap: () => void;
+  circuits?: Circuit[] | any;
+  userCheckIns?: string[] | any;
+  onSelectCafeFromCircuit?: (cafeId: string) => void;
+  [key: string]: any;
 }
 
-export const CircuitsTab: React.FC<CircuitsTabProps> = ({ circuits, onNavigateToMap }) => {
+const TOP_SAFE_PADDING =
+  Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 16 : 52;
+
+export const CircuitsTab: React.FC<CircuitsTabProps> = ({
+  circuits = [],
+  userCheckIns = [],
+  onSelectCafeFromCircuit,
+}) => {
+  const [selectedFilter, setSelectedFilter] = useState<'todos' | 'cambui' | 'barao' | 'taquaral'>('todos');
+
+  const circuitsList: Circuit[] = Array.isArray(circuits) ? circuits : [];
+  const checkInsList: string[] = Array.isArray(userCheckIns) ? userCheckIns : [];
+
+  const filteredCircuits = circuitsList.filter((circuit) => {
+    const title = (circuit.title || circuit.name || '').toLowerCase();
+    const region = (circuit.region || '').toLowerCase();
+    if (selectedFilter === 'todos') return true;
+    if (selectedFilter === 'cambui') return region.includes('cambu') || title.includes('cambu');
+    if (selectedFilter === 'barao') return region.includes('bar') || title.includes('bar');
+    if (selectedFilter === 'taquaral') return region.includes('taquaral') || title.includes('taquaral');
+    return true;
+  });
+
   return (
-    <ScrollView style={styles.tabContainer} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-      {/* CABEÇALHO DA ABA */}
-      <View style={styles.headerSection}>
-        <Text style={styles.sectionCategory}>CIRCUITOS URBANOS</Text>
-        <Text style={styles.sectionMainTitle}>Desafios de Campinas</Text>
-        <Text style={styles.sectionSubtitle}>
-          Complete os trajetos a pé, faça check-in nos cafés credenciados e conquiste medalhas exclusivas para o seu perfil.
-        </Text>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.badgeRow}>
+          <View style={styles.clubBadge}>
+            <Feather name="award" size={13} color="#FF6B00" />
+            <Text style={styles.clubBadgeText}>CLUBE RUNCOFFEE</Text>
+          </View>
+        </View>
+        <Text style={styles.title}>Circuitos Urbanos</Text>
+        <Text style={styles.subtitle}>Desafios e rotas de café em Campinas</Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterBar}>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedFilter === 'todos' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter('todos')}
+          >
+            <Text style={[styles.filterChipText, selectedFilter === 'todos' && styles.filterChipTextActive]}>
+              Todos ({circuitsList.length})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedFilter === 'cambui' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter('cambui')}
+          >
+            <Text style={[styles.filterChipText, selectedFilter === 'cambui' && styles.filterChipTextActive]}>
+              Cambuí
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedFilter === 'taquaral' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter('taquaral')}
+          >
+            <Text style={[styles.filterChipText, selectedFilter === 'taquaral' && styles.filterChipTextActive]}>
+              Taquaral
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterChip, selectedFilter === 'barao' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter('barao')}
+          >
+            <Text style={[styles.filterChipText, selectedFilter === 'barao' && styles.filterChipTextActive]}>
+              Barão Geraldo
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
-      {/* CARDS DE CADA CIRCUITO */}
-      {circuits.map((c) => {
-        const completedCount = c.visitedCafes.length;
-        const totalCount = c.cafes.length;
-        const progressPercent = Math.round((completedCount / totalCount) * 100);
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {filteredCircuits.map((circuit) => {
+          const rawCafes = Array.isArray(circuit.cafes) ? circuit.cafes : [];
+          const visitedCount = rawCafes.filter((cafeItem: any) => {
+            const cId = typeof cafeItem === 'string' ? cafeItem : cafeItem?.id;
+            return checkInsList.includes(cId);
+          }).length;
 
-        return (
-          <View key={c.id} style={styles.circuitCard}>
-            {/* Topo do Card com Badge e Distância */}
-            <View style={styles.circuitTopRow}>
-              <View style={styles.challengeBadge}>
-                <Ionicons name="flame" size={12} color="#FC4C02" style={{ marginRight: 4 }} />
-                <Text style={styles.challengeBadgeText}>DESAFIO OFICIAL</Text>
+          const totalCount = rawCafes.length;
+          const progressPercent = totalCount > 0 ? (visitedCount / totalCount) * 100 : 0;
+          const isCompleted = visitedCount === totalCount && totalCount > 0;
+          const distanceLabel = circuit.totalDistanceKm || circuit.distanceKm || circuit.distance || '4.0';
+          const pointsLabel = circuit.rewardPoints || circuit.points || '150';
+
+          return (
+            <View key={circuit.id} style={styles.circuitCard}>
+              <View style={styles.circuitHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.circuitTitle}>{circuit.title || circuit.name}</Text>
+                  <Text style={styles.circuitDesc}>{circuit.description}</Text>
+                </View>
+                <View style={styles.badgeContainer}>
+                  <Text style={styles.badgeIcon}>{circuit.badgeIcon || circuit.badge || '☕'}</Text>
+                </View>
               </View>
 
-              <View style={styles.distanceBadge}>
-                <Feather name="navigation" size={11} color="#A1A1AA" style={{ marginRight: 4 }} />
-                <Text style={styles.distanceBadgeText}>{c.distance}</Text>
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Feather name="navigation" size={14} color="#FF6B00" />
+                  <Text style={styles.metaText}>{distanceLabel} km</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Feather name="map-pin" size={14} color="#888" />
+                  <Text style={styles.metaText}>{totalCount} paradas</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Feather name="zap" size={14} color="#FFD700" />
+                  <Text style={styles.metaText}>+{pointsLabel} pts</Text>
+                </View>
               </View>
-            </View>
 
-            {/* Título e Descrição */}
-            <Text style={styles.circuitTitle}>{c.title}</Text>
-            <Text style={styles.circuitDesc}>{c.description}</Text>
-
-            {/* BARRA DE PROGRESSO DO CIRCUITO */}
-            <View style={styles.progressBarWrapper}>
-              <View style={styles.progressBarTrack}>
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      width: `${progressPercent}%`,
-                      backgroundColor: c.completed ? '#10B981' : '#FC4C02',
-                    },
-                  ]}
-                />
+              <View style={styles.progressContainer}>
+                <View style={styles.progressLabelRow}>
+                  <Text style={styles.progressLabel}>
+                    {isCompleted ? '🎉 Circuito Concluído!' : `${visitedCount} de ${totalCount} cafeterias`}
+                  </Text>
+                  <Text style={styles.progressPercent}>{Math.round(progressPercent)}%</Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${progressPercent}%` },
+                      isCompleted && { backgroundColor: '#4CAF50' },
+                    ]}
+                  />
+                </View>
               </View>
-              <Text style={styles.progressStatusText}>
-                {c.completed ? 'COMPLETO 🏆' : `${completedCount} de ${totalCount} cafeterias`}
-              </Text>
-            </View>
 
-            {/* TIMELINE DE CHECKPOINTS (LINHA VERTICAL ESTILO STRAVA) */}
-            <View style={styles.stepperContainer}>
-              {c.cafes.map((cafeName, i) => {
-                const isVisited = c.visitedCafes.some(
-                  (v) => v.toLowerCase() === cafeName.toLowerCase() || v.includes(cafeName)
-                );
-                const isLast = i === c.cafes.length - 1;
+              <View style={styles.stepperContainer}>
+                {rawCafes.map((cafeItem: any, index: number) => {
+                  const cafeId = typeof cafeItem === 'string' ? cafeItem : cafeItem?.id;
+                  const cafeName = typeof cafeItem === 'string' ? cafeItem : cafeItem?.name || 'Cafeteria';
+                  const cafeAddress = typeof cafeItem === 'string' ? 'Campinas/SP' : cafeItem?.address || 'Campinas/SP';
+                  const isVisited = checkInsList.includes(cafeId);
+                  const isLast = index === rawCafes.length - 1;
 
-                return (
-                  <View key={i} style={styles.stepperItem}>
-                    {/* Linha e Ponto da Timeline */}
-                    <View style={styles.stepperTrackCol}>
-                      <View
-                        style={[
-                          styles.stepperDot,
-                          isVisited && styles.stepperDotCompleted,
-                        ]}
-                      >
-                        {isVisited ? (
-                          <Feather name="check" size={10} color="#FFF" />
-                        ) : (
-                          <View style={styles.stepperDotInner} />
-                        )}
+                  return (
+                    <TouchableOpacity
+                      key={`cafe-step-${index}`}
+                      style={styles.stepRow}
+                      activeOpacity={0.7}
+                      onPress={() => onSelectCafeFromCircuit && cafeId && onSelectCafeFromCircuit(cafeId)}
+                    >
+                      <View style={styles.stepIndicatorCol}>
+                        <View style={[styles.stepCircle, isVisited && styles.stepCircleVisited]}>
+                          {isVisited ? (
+                            <Feather name="check" size={12} color="#FFF" />
+                          ) : (
+                            <Text style={styles.stepNumber}>{index + 1}</Text>
+                          )}
+                        </View>
+                        {!isLast && <View style={[styles.stepLine, isVisited && styles.stepLineVisited]} />}
                       </View>
-                      {!isLast && (
-                        <View
-                          style={[
-                            styles.stepperConnectingLine,
-                            isVisited && styles.stepperConnectingLineCompleted,
-                          ]}
-                        />
-                      )}
-                    </View>
 
-                    {/* Informações da Etapa */}
-                    <View style={styles.stepperContent}>
-                      <Text
-                        style={[
-                          styles.stepperCafeName,
-                          isVisited && styles.stepperCafeNameCompleted,
-                        ]}
-                      >
-                        {cafeName}
-                      </Text>
-                      <Text style={styles.stepperStepSubtitle}>
-                        {isVisited ? 'Check-in confirmado ✓' : `Etapa ${i + 1} do percurso`}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
+                      <View style={styles.stepInfo}>
+                        <Text style={[styles.stepCafeName, isVisited && styles.stepCafeVisited]}>
+                          {cafeName}
+                        </Text>
+                        <Text style={styles.stepCafeAddress} numberOfLines={1}>
+                          {cafeAddress}
+                        </Text>
+                      </View>
 
-            {/* CAIXA DE RECOMPENSA (MEDALHA) */}
-            <View style={styles.rewardBox}>
-              <View style={styles.rewardIconBox}>
-                <Ionicons name="trophy" size={16} color="#F59E0B" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rewardLabel}>RECOMPENSA DE ATLETA</Text>
-                <Text style={styles.rewardTitle}>{c.badgeAwarded}</Text>
+                      <Feather name="chevron-right" size={16} color="#444" />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
-
-            {/* BOTÃO DE AÇÃO */}
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                c.completed && styles.actionButtonCompleted,
-              ]}
-              onPress={() => {
-                if (c.completed) {
-                  Alert.alert('Circuito Concluído! 🏆', 'Você já finalizou todas as paradas e ganhou a medalha!');
-                } else {
-                  Alert.alert('Circuito Selecionado! 🏃‍♂️', 'Abrindo o mapa para você iniciar a rota pelo primeiro checkpoint.');
-                  onNavigateToMap();
-                }
-              }}
-            >
-              <Feather
-                name={c.completed ? 'award' : 'map'}
-                size={16}
-                color="#FFF"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.actionButtonText}>
-                {c.completed ? 'Medalha Conquistada' : 'Explorar Rota no Mapa'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        );
-      })}
-    </ScrollView>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  tabContainer: {
+  container: {
     flex: 1,
     backgroundColor: '#0D0D0D',
   },
-  headerSection: {
-    marginBottom: 20,
-    marginTop: 6,
+  header: {
+    paddingTop: TOP_SAFE_PADDING,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    backgroundColor: '#141414',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
   },
-  sectionCategory: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FC4C02',
-    letterSpacing: 1.2,
-  },
-  sectionMainTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFF',
-    marginTop: 4,
+  badgeRow: {
+    flexDirection: 'row',
     marginBottom: 6,
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: '#A1A1AA',
-    lineHeight: 18,
-  },
-
-  // CARD DO CIRCUITO
-  circuitCard: {
-    backgroundColor: '#18181B',
-    borderRadius: 22,
-    padding: 18,
-    marginBottom: 18,
+  clubBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,107,0,0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#27272A',
+    borderColor: 'rgba(255,107,0,0.3)',
   },
-  circuitTopRow: {
+  clubBadgeText: {
+    color: '#FF6B00',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  filterBar: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#202020',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#303030',
+  },
+  filterChipActive: {
+    backgroundColor: '#FF6B00',
+    borderColor: '#FF6B00',
+  },
+  filterChipText: {
+    color: '#AAA',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 110,
+  },
+  circuitCard: {
+    backgroundColor: '#181818',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#262626',
+  },
+  circuitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  challengeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(252, 76, 2, 0.12)',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(252, 76, 2, 0.25)',
-  },
-  challengeBadgeText: {
-    color: '#FC4C02',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  distanceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#27272A',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  distanceBadgeText: {
-    color: '#E4E4E7',
-    fontSize: 11,
-    fontWeight: '700',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   circuitTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#FFF',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   circuitDesc: {
     fontSize: 13,
-    color: '#A1A1AA',
+    color: '#8E8E8E',
     lineHeight: 18,
-    marginBottom: 14,
   },
-
-  // BARRA DE PROGRESSO
-  progressBarWrapper: {
+  badgeContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#262626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#3A3A3A',
+  },
+  badgeIcon: {
+    fontSize: 22,
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-    paddingBottom: 14,
+    gap: 16,
+    marginTop: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#27272A',
+    borderBottomColor: '#242424',
   },
-  progressBarTrack: {
-    flex: 1,
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    fontSize: 13,
+    color: '#CCC',
+    fontWeight: '500',
+  },
+  progressContainer: {
+    marginTop: 12,
+  },
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: '#AAA',
+    fontWeight: '600',
+  },
+  progressPercent: {
+    fontSize: 12,
+    color: '#FF6B00',
+    fontWeight: '700',
+  },
+  progressBarBg: {
     height: 6,
-    backgroundColor: '#27272A',
+    backgroundColor: '#2A2A2A',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
+    backgroundColor: '#FF6B00',
     borderRadius: 3,
   },
-  progressStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#71717A',
-  },
-
-  // STEPPER TIMELINE
   stepperContainer: {
-    marginBottom: 16,
-    paddingHorizontal: 4,
+    marginTop: 16,
+    paddingTop: 8,
   },
-  stepperItem: {
+  stepRow: {
     flexDirection: 'row',
-    minHeight: 46,
-  },
-  stepperTrackCol: {
-    width: 24,
     alignItems: 'center',
+    marginBottom: 10,
   },
-  stepperDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#27272A',
+  stepIndicatorCol: {
+    alignItems: 'center',
+    width: 28,
+    marginRight: 10,
+  },
+  stepCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#262626',
+    borderWidth: 1.5,
+    borderColor: '#555',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#3F3F46',
-    zIndex: 2,
   },
-  stepperDotCompleted: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981',
+  stepCircleVisited: {
+    backgroundColor: '#FF6B00',
+    borderColor: '#FF6B00',
   },
-  stepperDotInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#71717A',
+  stepNumber: {
+    fontSize: 10,
+    color: '#AAA',
+    fontWeight: '700',
   },
-  stepperConnectingLine: {
+  stepLine: {
     width: 2,
-    flex: 1,
-    backgroundColor: '#27272A',
-    marginVertical: 2,
-  },
-  stepperConnectingLineCompleted: {
-    backgroundColor: '#10B981',
-  },
-  stepperContent: {
-    flex: 1,
-    marginLeft: 12,
-    paddingBottom: 10,
-  },
-  stepperCafeName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#E4E4E7',
-  },
-  stepperCafeNameCompleted: {
-    color: '#10B981',
-  },
-  stepperStepSubtitle: {
-    fontSize: 11,
-    color: '#71717A',
+    height: 24,
+    backgroundColor: '#2D2D2D',
     marginTop: 2,
   },
-
-  // RECOMPENSA
-  rewardBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-    borderRadius: 14,
-    padding: 12,
-    gap: 10,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.25)',
+  stepLineVisited: {
+    backgroundColor: '#FF6B00',
   },
-  rewardIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  stepInfo: {
+    flex: 1,
   },
-  rewardLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#F59E0B',
-    letterSpacing: 0.8,
-  },
-  rewardTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginTop: 2,
-  },
-
-  // BOTÃO DO CIRCUITO
-  actionButton: {
-    backgroundColor: '#FC4C02',
-    paddingVertical: 12,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonCompleted: {
-    backgroundColor: '#10B981',
-  },
-  actionButtonText: {
-    color: '#FFF',
-    fontWeight: 'bold',
+  stepCafeName: {
     fontSize: 14,
+    color: '#EEE',
+    fontWeight: '600',
+  },
+  stepCafeVisited: {
+    color: '#FFF',
+    fontWeight: '700',
+  },
+  stepCafeAddress: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 1,
   },
 });
