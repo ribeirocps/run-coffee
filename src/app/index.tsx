@@ -48,6 +48,11 @@ export default function RunCoffeeApp() {
   const [userCrowns, setUserCrowns] = useState(1);
   const [userMedals, setUserMedals] = useState<string[]>(['🏅 Primeiro 5k']);
 
+  // Modal de Editar Perfil
+  const [isEditProfileModalVisible, setIsEditProfileModalVisible] = useState(false);
+  const [editProfileName, setEditProfileName] = useState(userName);
+  const [editProfilePhoto, setEditProfilePhoto] = useState(userAvatar);
+
   // Cafés e Localização
   const [cafes, setCafes] = useState<Cafe[]>(INITIAL_CAFES);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -98,6 +103,14 @@ export default function RunCoffeeApp() {
         const storedProfile = await AsyncStorage.getItem(STORAGE_PROFILE_KEY);
         if (storedProfile) {
           const prof = JSON.parse(storedProfile);
+          if (prof.name) {
+            setUserName(prof.name);
+            setEditProfileName(prof.name);
+          }
+          if (prof.avatar) {
+            setUserAvatar(prof.avatar);
+            setEditProfilePhoto(prof.avatar);
+          }
           if (prof.visits !== undefined) setUserVisits(prof.visits);
           if (prof.km !== undefined) setUserKm(prof.km);
           if (prof.crowns !== undefined) setUserCrowns(prof.crowns);
@@ -107,9 +120,26 @@ export default function RunCoffeeApp() {
     })();
   }, []);
 
-  const saveProfileData = async (visits: number, km: number, crowns: number, medals: string[]) => {
+  const saveProfileData = async (
+    visits: number,
+    km: number,
+    crowns: number,
+    medals: string[],
+    name?: string,
+    avatar?: string
+  ) => {
     try {
-      await AsyncStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify({ visits, km, crowns, medals }));
+      await AsyncStorage.setItem(
+        STORAGE_PROFILE_KEY,
+        JSON.stringify({
+          name: name || userName,
+          avatar: avatar || userAvatar,
+          visits,
+          km,
+          crowns,
+          medals,
+        })
+      );
     } catch (e) {}
   };
 
@@ -123,6 +153,44 @@ export default function RunCoffeeApp() {
     try {
       await AsyncStorage.setItem(STORAGE_CIRCUITS_KEY, JSON.stringify(newCircuitsList));
     } catch (e) {}
+  };
+
+  // Abrir Modal de Edição de Perfil
+  const handleOpenEditProfile = () => {
+    setEditProfileName(userName);
+    setEditProfilePhoto(userAvatar);
+    setIsEditProfileModalVisible(true);
+  };
+
+  // Escolher Foto de Perfil na Galeria
+  const handlePickProfilePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setEditProfilePhoto(result.assets[0].uri);
+      }
+    } catch (e) {}
+  };
+
+  // Salvar Edição do Perfil
+  const handleSaveProfile = () => {
+    if (!editProfileName.trim()) {
+      Alert.alert('Atenção', 'Por favor, digite seu nome.');
+      return;
+    }
+    const finalName = editProfileName.trim();
+    const finalPhoto = editProfilePhoto;
+    setUserName(finalName);
+    setUserAvatar(finalPhoto);
+    saveProfileData(userVisits, userKm, userCrowns, userMedals, finalName, finalPhoto);
+    setIsEditProfileModalVisible(false);
+    Alert.alert('Perfil Atualizado! 🎉', 'Seu nome e foto foram salvos com sucesso.');
   };
 
   // 2. GPS do Usuário
@@ -259,6 +327,7 @@ export default function RunCoffeeApp() {
       userName,
       userLevel: currentLevel,
       avatar: userAvatar,
+      avatarUrl: userAvatar.startsWith('file://') || userAvatar.startsWith('http') ? userAvatar : undefined,
       timeAgo: 'Agora mesmo',
       cafeName: cafe.name,
       distanceKm: cafe.distanceKm ? `${cafe.distanceKm} km` : '1.5 km',
@@ -389,6 +458,7 @@ export default function RunCoffeeApp() {
       userName,
       userLevel: currentLevel,
       avatar: userAvatar,
+      avatarUrl: userAvatar.startsWith('file://') || userAvatar.startsWith('http') ? userAvatar : undefined,
       timeAgo: 'Agora mesmo',
       cafeName: postCafe.trim() || 'Treino Livre',
       distanceKm: postDistance.trim() ? `${postDistance.trim()} km` : undefined,
@@ -580,6 +650,8 @@ export default function RunCoffeeApp() {
     </html>
   `;
 
+  const isEditPhotoReal = editProfilePhoto.startsWith('file://') || editProfilePhoto.startsWith('http');
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D0D" />
@@ -621,6 +693,7 @@ export default function RunCoffeeApp() {
               <Ionicons name="locate" size={22} color="#0D0D0D" />
             </TouchableOpacity>
 
+            {/* Card de Rota Ativa */}
             {activeRoute && (
               <View style={styles.activeRouteCard}>
                 <View style={{ flex: 1 }}>
@@ -748,6 +821,7 @@ export default function RunCoffeeApp() {
           />
         )}
 
+        {/* ABA 4: PERFIL COM ABERTURA DO MODAL NO NÍVEL RAIZ */}
         {activeTab === 'perfil' && (
           <ProfileTab
             userName={userName}
@@ -757,6 +831,7 @@ export default function RunCoffeeApp() {
             userCrowns={userCrowns}
             userMedals={userMedals}
             circuits={circuits}
+            onOpenEditProfile={handleOpenEditProfile}
           />
         )}
       </View>
@@ -811,6 +886,69 @@ export default function RunCoffeeApp() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* ========================================================= */}
+      {/* MODAL DE EDITAR PERFIL (NO NÍVEL RAIZ - 100% FUNCIONAL) */}
+      {/* ========================================================= */}
+      <Modal
+        visible={isEditProfileModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsEditProfileModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={styles.editProfileCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#FFF' }}>Editar Perfil do Atleta</Text>
+              <TouchableOpacity onPress={() => setIsEditProfileModalVisible(false)}>
+                <Feather name="x" size={20} color="#A1A1AA" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Foto com atalho para galeria */}
+            <View style={{ alignItems: 'center', marginVertical: 18 }}>
+              <TouchableOpacity
+                style={styles.pickPhotoWrapper}
+                activeOpacity={0.8}
+                onPress={handlePickProfilePhoto}
+              >
+                {isEditPhotoReal ? (
+                  <Image source={{ uri: editProfilePhoto }} style={{ width: '100%', height: '100%' }} />
+                ) : (
+                  <View style={styles.editPreviewFallback}>
+                    <Text style={{ fontSize: 36 }}>{editProfilePhoto}</Text>
+                  </View>
+                )}
+                <View style={styles.pickPhotoIconOverlay}>
+                  <Feather name="camera" size={13} color="#FFF" />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handlePickProfilePhoto} style={{ marginTop: 8 }}>
+                <Text style={{ color: '#FC4C02', fontSize: 13, fontWeight: '700' }}>
+                  Escolher foto da galeria
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>NOME DO CORREDOR</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editProfileName}
+              onChangeText={setEditProfileName}
+              placeholder="Digite seu nome (Ex: Henrique)"
+              placeholderTextColor="#71717A"
+              maxLength={30}
+            />
+
+            <TouchableOpacity style={styles.saveNominationBtn} onPress={handleSaveProfile}>
+              <Text style={styles.saveNominationBtnText}>Salvar Perfil</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* MODAL 1: CUPOM */}
       <Modal visible={isPerkModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsPerkModalVisible(false)}>
@@ -868,7 +1006,7 @@ export default function RunCoffeeApp() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* MODAL 4: NOVA PUBLICAÇÃO (COM CAMPO DE KM) */}
+      {/* MODAL 4: NOVA PUBLICAÇÃO */}
       <Modal visible={isPostModalVisible} animationType="slide" transparent={true} onRequestClose={() => setIsPostModalVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#18181B', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, maxHeight: '90%' }}>
@@ -1236,6 +1374,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+
+  // CARD DE EDITAR PERFIL
+  editProfileCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  pickPhotoWrapper: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    position: 'relative',
+    borderWidth: 2,
+    borderColor: '#FC4C02',
+    overflow: 'hidden',
+  },
+  editPreviewFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#27272A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pickPhotoIconOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#71717A',
+    letterSpacing: 1,
+    marginBottom: 8,
+  },
+
   perkModalCard: {
     backgroundColor: '#18181B',
     borderRadius: 24,
@@ -1335,7 +1516,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 13,
     fontSize: 14,
-    marginBottom: 10,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#3F3F46',
   },
