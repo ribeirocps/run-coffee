@@ -27,10 +27,13 @@ export interface Circuit {
 export interface CommunityPost {
   id: string;
   userName: string;
+  userLevel?: string;
   avatar: string;
   avatarUrl?: string;
   timeAgo: string;
   cafeName: string;
+  distanceKm?: string;
+  durationMin?: string;
   text: string;
   photo: string | null;
   cheers: number;

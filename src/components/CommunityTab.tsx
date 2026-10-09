@@ -1,13 +1,13 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    Image,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { INITIAL_CAFES } from '../data/initialData';
 import { Cafe, CommunityPost } from '../types';
@@ -29,9 +29,23 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
 }) => {
   const [selectedStory, setSelectedStory] = useState<CommunityPost | null>(null);
 
+  // Retorna a cor e o ícone do nível do atleta
+  const getLevelBadgeInfo = (level?: string) => {
+    if (level === 'Master Coffee Lover') {
+      return { color: '#FC4C02', bg: 'rgba(252, 76, 2, 0.12)', icon: 'ribbon' };
+    }
+    if (level === 'Rei da Casa') {
+      return { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)', icon: 'trophy' };
+    }
+    if (level === 'Coffee Hunter') {
+      return { color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)', icon: 'compass' };
+    }
+    return { color: '#A1A1AA', bg: 'rgba(161, 161, 170, 0.12)', icon: 'coffee' };
+  };
+
   return (
     <ScrollView style={styles.tabContainer} contentContainerStyle={{ paddingBottom: 30 }}>
-      {/* 1. CARROSSEL DE STORIES: ÚLTIMOS CHECK-INS AO VIVO */}
+      {/* 1. CARROSSEL DE STORIES: ÚLTIMOS CHECK-INS */}
       <View style={styles.storiesSection}>
         <View style={styles.storiesHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -63,7 +77,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             <Text style={styles.storySubLabel}>Postar</Text>
           </TouchableOpacity>
 
-          {/* Círculos 2+: Os últimos check-ins da comunidade com foto */}
+          {/* Círculos 2+: Os últimos check-ins da comunidade */}
           {posts.map((post) => (
             <TouchableOpacity
               key={post.id}
@@ -99,71 +113,108 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
       </View>
 
       <View style={{ paddingHorizontal: 16 }}>
-        {/* 2. BOTÃO DE POSTAR / COMPARTILHAR TREINO */}
+        {/* 2. BOTÃO DE POSTAR */}
         <TouchableOpacity style={styles.postActionButton} onPress={onOpenPostModal}>
           <Feather name="edit-3" size={17} color="#FFF" style={{ marginRight: 8 }} />
           <Text style={styles.postActionButtonText}>
-            Compartilhar Café ou Corrida
+            Compartilhar Treino ou Café
           </Text>
         </TouchableOpacity>
 
-        {/* 3. FEED SOCIAL DA COMUNIDADE */}
+        {/* 3. FEED SOCIAL COM MÉTRICAS E NÍVEIS */}
         <Text style={styles.sectionHeading}>FEED DE ATIVIDADES</Text>
 
-        {posts.map((post) => (
-          <View key={post.id} style={styles.postCard}>
-            <View style={styles.postHeader}>
-              {post.avatarUrl ? (
-                <Image source={{ uri: post.avatarUrl }} style={styles.postAvatarImage} />
-              ) : (
-                <View style={styles.postAvatarBox}>
-                  <Text style={{ fontSize: 16 }}>{post.avatar}</Text>
-                </View>
-              )}
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={styles.postAuthor}>{post.userName}</Text>
-                <View style={styles.postSubRow}>
-                  <Text style={styles.postTime}>{post.timeAgo}</Text>
-                  <Text style={styles.postDot}>•</Text>
-                  <View style={styles.cafeTagPill}>
-                    <Feather name="coffee" size={11} color="#FC4C02" style={{ marginRight: 3 }} />
-                    <Text style={styles.cafeTagText}>{post.cafeName}</Text>
+        {posts.map((post) => {
+          const badge = getLevelBadgeInfo(post.userLevel);
+
+          return (
+            <View key={post.id} style={styles.postCard}>
+              {/* Topo do Post: Foto, Nome e Selo de Nível */}
+              <View style={styles.postHeader}>
+                {post.avatarUrl ? (
+                  <Image source={{ uri: post.avatarUrl }} style={styles.postAvatarImage} />
+                ) : (
+                  <View style={styles.postAvatarBox}>
+                    <Text style={{ fontSize: 16 }}>{post.avatar}</Text>
+                  </View>
+                )}
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <Text style={styles.postAuthor}>{post.userName}</Text>
+                    {post.userLevel && (
+                      <View style={[styles.userLevelTag, { backgroundColor: badge.bg, borderColor: badge.color }]}>
+                        <Ionicons name={badge.icon as any} size={10} color={badge.color} style={{ marginRight: 3 }} />
+                        <Text style={[styles.userLevelTagText, { color: badge.color }]}>
+                          {post.userLevel}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <View style={styles.postSubRow}>
+                    <Text style={styles.postTime}>{post.timeAgo}</Text>
+                    <Text style={styles.postDot}>•</Text>
+                    <View style={styles.cafeTagPill}>
+                      <Feather name="coffee" size={11} color="#FC4C02" style={{ marginRight: 3 }} />
+                      <Text style={styles.cafeTagText}>{post.cafeName}</Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
 
-            <Text style={styles.postText}>{post.text}</Text>
+              {/* Pílulas de Métricas de Treino (Distância & Duração) */}
+              {(post.distanceKm || post.durationMin) && (
+                <View style={styles.metricsRow}>
+                  {post.distanceKm && (
+                    <View style={styles.metricPill}>
+                      <Feather name="trending-up" size={11} color="#FC4C02" style={{ marginRight: 4 }} />
+                      <Text style={styles.metricPillText}>{post.distanceKm}</Text>
+                    </View>
+                  )}
+                  {post.durationMin && (
+                    <View style={styles.metricPill}>
+                      <Feather name="clock" size={11} color="#A1A1AA" style={{ marginRight: 4 }} />
+                      <Text style={styles.metricPillText}>{post.durationMin}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
 
-            {post.photo && (
-              <Image source={{ uri: post.photo }} style={styles.postImage} />
-            )}
+              {/* Texto do Post */}
+              <Text style={styles.postText}>{post.text}</Text>
 
-            <View style={styles.postFooter}>
-              <TouchableOpacity
-                style={[
-                  styles.cheerButton,
-                  post.hasCheered && styles.cheerButtonActive,
-                ]}
-                onPress={() => onToggleCheer(post.id)}
-              >
-                <Ionicons
-                  name={post.hasCheered ? 'flame' : 'flame-outline'}
-                  size={16}
-                  color={post.hasCheered ? '#FC4C02' : '#A3A3A3'}
-                />
-                <Text
+              {/* Foto anexada */}
+              {post.photo && (
+                <Image source={{ uri: post.photo }} style={styles.postImage} />
+              )}
+
+              {/* Rodapé com Brinde */}
+              <View style={styles.postFooter}>
+                <TouchableOpacity
                   style={[
-                    styles.cheerButtonText,
-                    post.hasCheered && styles.cheerButtonTextActive,
+                    styles.cheerButton,
+                    post.hasCheered && styles.cheerButtonActive,
                   ]}
+                  onPress={() => onToggleCheer(post.id)}
                 >
-                  {post.hasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheers})
-                </Text>
-              </TouchableOpacity>
+                  <Ionicons
+                    name={post.hasCheered ? 'flame' : 'flame-outline'}
+                    size={16}
+                    color={post.hasCheered ? '#FC4C02' : '#A3A3A3'}
+                  />
+                  <Text
+                    style={[
+                      styles.cheerButtonText,
+                      post.hasCheered && styles.cheerButtonTextActive,
+                    ]}
+                  >
+                    {post.hasCheered ? 'Brindado!' : 'Brinde!'} ({post.cheers})
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {/* MODAL STORY */}
@@ -210,6 +261,24 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             )}
 
             <View style={{ padding: 16 }}>
+              {/* Métricas no Story */}
+              {(selectedStory?.distanceKm || selectedStory?.durationMin) && (
+                <View style={[styles.metricsRow, { marginBottom: 10 }]}>
+                  {selectedStory.distanceKm && (
+                    <View style={styles.metricPill}>
+                      <Feather name="trending-up" size={11} color="#FC4C02" style={{ marginRight: 4 }} />
+                      <Text style={styles.metricPillText}>{selectedStory.distanceKm}</Text>
+                    </View>
+                  )}
+                  {selectedStory.durationMin && (
+                    <View style={styles.metricPill}>
+                      <Feather name="clock" size={11} color="#A1A1AA" style={{ marginRight: 4 }} />
+                      <Text style={styles.metricPillText}>{selectedStory.durationMin}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               <Text style={{ color: '#E4E4E7', fontSize: 14, lineHeight: 20 }}>
                 {selectedStory?.text}
               </Text>
@@ -252,7 +321,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0D0D',
   },
-  // STORIES
   storiesSection: {
     paddingVertical: 14,
     borderBottomWidth: 1,
@@ -375,8 +443,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#71717A',
   },
-
-  // BOTÃO COMPARTILHAR
   postActionButton: {
     backgroundColor: '#27272A',
     flexDirection: 'row',
@@ -393,7 +459,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-
   sectionHeading: {
     fontSize: 11,
     fontWeight: '800',
@@ -401,8 +466,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 12,
   },
-
-  // FEED CARDS
   postCard: {
     backgroundColor: '#18181B',
     borderRadius: 18,
@@ -414,7 +477,7 @@ const styles = StyleSheet.create({
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   postAvatarImage: {
     width: 38,
@@ -433,6 +496,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#FFF',
+  },
+  userLevelTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 1.5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  userLevelTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
   },
   postSubRow: {
     flexDirection: 'row',
@@ -460,6 +536,24 @@ const styles = StyleSheet.create({
     color: '#FC4C02',
     fontSize: 11,
     fontWeight: '600',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  metricPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#27272A',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  metricPillText: {
+    color: '#E4E4E7',
+    fontSize: 11,
+    fontWeight: '700',
   },
   postText: {
     fontSize: 14,
@@ -500,8 +594,6 @@ const styles = StyleSheet.create({
     color: '#FC4C02',
     fontWeight: 'bold',
   },
-
-  // MODAL STORY VISUALIZER
   storyModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',
