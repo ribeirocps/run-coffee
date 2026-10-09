@@ -195,7 +195,6 @@ export default function RunCoffeeApp() {
       const loc = await Location.getCurrentPositionAsync({});
       const distance = getDistanceInMeters(loc.coords.latitude, loc.coords.longitude, cafe.lat, cafe.lng);
 
-      // Verificação de proximidade (150m)
       if (distance > 150) {
         Alert.alert(
           'Fora do Raio',
@@ -206,7 +205,6 @@ export default function RunCoffeeApp() {
 
       processCheckIn(cafe);
     } catch (e) {
-      // Fallback em caso de simulador
       processCheckIn(cafe);
     }
   };
@@ -223,7 +221,6 @@ export default function RunCoffeeApp() {
       setUserCheckIns([...userCheckIns, cafe.id]);
     }
 
-    // Lógica do Reinado
     const currentKingVisits = cafe.kingVisits || cafe.kingCheckins || 10;
     if (nextVisits > currentKingVisits) {
       nextCrowns += 1;
@@ -260,7 +257,7 @@ export default function RunCoffeeApp() {
     setIsNominateCafeVisible(false);
   };
 
-  // HTML do Mapa Leaflet com tiles do Google Maps e Marcadores de Café
+  // HTML do Mapa com Nomes das Cafeterias Visíveis
   const mapHtml = `
     <!DOCTYPE html>
     <html>
@@ -270,27 +267,45 @@ export default function RunCoffeeApp() {
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>
           html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; background: #121212; }
+          .custom-cafe-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+          }
           .cafe-pin {
             background-color: #FF6B00;
             color: #FFF;
             border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
             display: flex;
             align-items: center;
             justify-content: center;
             border: 2.5px solid #FFFFFF;
             box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 17px;
+          }
+          .cafe-label {
+            background: rgba(18, 18, 18, 0.94);
+            color: #FFFFFF;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 107, 0, 0.6);
+            margin-top: 4px;
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.6);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           }
           .user-pin {
             background-color: #2196F3;
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             border: 3px solid #FFF;
-            box-shadow: 0 0 12px rgba(33,150,243,0.8);
+            box-shadow: 0 0 14px rgba(33,150,243,0.9);
           }
         </style>
       </head>
@@ -299,22 +314,29 @@ export default function RunCoffeeApp() {
         <script>
           var map = L.map('map', { zoomControl: false }).setView([-22.8985, -47.0535], 14);
           
-          // Google Maps Raster Tiles
           L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 19,
             attribution: 'Google Maps'
           }).addTo(map);
 
-          var cafeIcon = L.divIcon({
-            className: 'custom-cafe-icon',
-            html: '<div class="cafe-pin">☕</div>',
-            iconSize: [36, 36],
-            iconAnchor: [18, 18]
-          });
-
           var cafesData = ${JSON.stringify(cafes)};
 
           cafesData.forEach(function(cafe) {
+            var shortName = cafe.name.split(' ')[0];
+            if (shortName === 'D.Origem') shortName = 'D.Origem';
+            else if (shortName === 'Container') shortName = 'Container';
+            else if (shortName === 'Abigail') shortName = 'Abigail';
+            else if (shortName === 'Café') shortName = 'Taquaral';
+            else if (shortName === 'Estação') shortName = 'Estação Barão';
+            else if (shortName === 'Nicho') shortName = 'Nicho';
+
+            var cafeIcon = L.divIcon({
+              className: 'custom-cafe-div-icon',
+              html: '<div class="custom-cafe-wrapper"><div class="cafe-pin">☕</div><div class="cafe-label">' + shortName + '</div></div>',
+              iconSize: [90, 60],
+              iconAnchor: [45, 19]
+            });
+
             var marker = L.marker([cafe.lat, cafe.lng], { icon: cafeIcon }).addTo(map);
             marker.on('click', function() {
               window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SELECT_CAFE', cafeId: cafe.id }));
@@ -327,8 +349,8 @@ export default function RunCoffeeApp() {
               var userIcon = L.divIcon({
                 className: 'custom-user-icon',
                 html: '<div class="user-pin"></div>',
-                iconSize: [18, 18],
-                iconAnchor: [9, 9]
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
               });
               L.marker([${userLocation.lat},${userLocation.lng}], { icon: userIcon }).addTo(map);
             `
@@ -367,16 +389,6 @@ export default function RunCoffeeApp() {
             style={styles.webView}
             onMessage={handleMapMessage}
           />
-
-          {/* Botão Superior Flutuante: Indicar Cafeteria */}
-          <TouchableOpacity
-            style={[styles.floatingNominateBtn, { top: (StatusBar.currentHeight || 24) + 14 }]}
-            activeOpacity={0.8}
-            onPress={() => setIsNominateCafeVisible(true)}
-          >
-            <Feather name="plus-circle" size={16} color="#FF6B00" />
-            <Text style={styles.floatingNominateText}>Indicar Cafeteria</Text>
-          </TouchableOpacity>
 
           {/* Botão de Localização GPS */}
           <TouchableOpacity
@@ -486,53 +498,81 @@ export default function RunCoffeeApp() {
           onSelectCafe={(cafe) => {
             setSelectedCafe(cafe);
             setActiveTab('mapa');
-            if (webViewRef.current) {
-              webViewRef.current.injectJavaScript(`centerOn(${cafe.lat}, ${cafe.lng}); true;`);
-            }
+            // Delay seguro para o mapa renderizar na tela antes da animação de voo
+            setTimeout(() => {
+              if (webViewRef.current) {
+                webViewRef.current.injectJavaScript(`centerOn(${cafe.lat}, ${cafe.lng}); true;`);
+              }
+            }, 350);
           }}
         />
       )}
 
-      {/* BARRA INFERIOR MODERNA (DOCK) */}
-      <View style={[styles.bottomTabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('circuitos')}>
+      {/* ======================================================== */}
+      {/* NOVO DOCK: + CAFETERIA / CIRCUITOS / MAPA / CLUBE / PERFIL */}
+      {/* ======================================================== */}
+      <View style={[styles.bottomTabBar, { bottom: Math.max(insets.bottom, 16) }]}>
+        
+        {/* 1. + Cafeteria */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setIsNominateCafeVisible(true)}
+        >
+          <Feather name="plus-circle" size={19} color="#888" />
+          <Text style={styles.tabLabel}>+ Cafeteria</Text>
+        </TouchableOpacity>
+
+        {/* 2. Circuitos */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('circuitos')}
+        >
           <Feather
             name="compass"
-            size={20}
-            color={activeTab === 'circuitos' ? '#FF6B00' : '#737373'}
+            size={19}
+            color={activeTab === 'circuitos' ? '#FF6B00' : '#888'}
           />
           <Text style={[styles.tabLabel, activeTab === 'circuitos' && styles.tabLabelActive]}>
             Circuitos
           </Text>
         </TouchableOpacity>
 
-        {/* Botão Central Elevado: Mapa */}
+        {/* 3. Mapa (Botão Central Elevado, APENAS O ÍCONE) */}
         <TouchableOpacity
-          style={[styles.tabButton, styles.mapCenterTabButton, activeTab === 'mapa' && styles.mapCenterActive]}
+          style={[
+            styles.mapCenterTabButton,
+            activeTab === 'mapa' && styles.mapCenterActive,
+          ]}
           onPress={() => setActiveTab('mapa')}
+          activeOpacity={0.85}
         >
-          <Feather name="map-pin" size={22} color="#FFF" />
-          <Text style={styles.mapCenterLabel}>Mapa</Text>
+          <Feather name="map-pin" size={24} color="#FFF" />
         </TouchableOpacity>
 
-        {/* Botão do Clube */}
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('comunidade')}>
+        {/* 4. Clube */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('comunidade')}
+        >
           <Feather
             name="users"
-            size={20}
-            color={activeTab === 'comunidade' ? '#FF6B00' : '#737373'}
+            size={19}
+            color={activeTab === 'comunidade' ? '#FF6B00' : '#888'}
           />
           <Text style={[styles.tabLabel, activeTab === 'comunidade' && styles.tabLabelActive]}>
             Clube
           </Text>
         </TouchableOpacity>
 
-        {/* Botão do Perfil */}
-        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('perfil')}>
+        {/* 5. Perfil */}
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab('perfil')}
+        >
           <Feather
             name="user"
-            size={20}
-            color={activeTab === 'perfil' ? '#FF6B00' : '#737373'}
+            size={19}
+            color={activeTab === 'perfil' ? '#FF6B00' : '#888'}
           />
           <Text style={[styles.tabLabel, activeTab === 'perfil' && styles.tabLabelActive]}>
             Perfil
@@ -541,7 +581,7 @@ export default function RunCoffeeApp() {
       </View>
 
       {/* ======================================================== */}
-      {/* MODAIS NO NÍVEL RAIZ (GARANTIA CONTRA BUGS NO ANDROID)    */}
+      {/* MODAIS NO NÍVEL RAIZ                                     */}
       {/* ======================================================== */}
 
       {/* 1. MODAL CORTESIA (TIMER 90S) */}
@@ -645,7 +685,7 @@ export default function RunCoffeeApp() {
         </View>
       </Modal>
 
-      {/* 4. MODAL EDITAR PERFIL (COM SOBRE DE 124 CARACTERES) */}
+      {/* 4. MODAL EDITAR PERFIL */}
       <Modal
         visible={isEditProfileVisible}
         transparent
@@ -680,7 +720,7 @@ export default function RunCoffeeApp() {
               placeholderTextColor="#666"
             />
 
-            {/* Campo SOBRE (Bio até 124 caracteres) */}
+            {/* Campo SOBRE */}
             <View style={styles.bioHeaderRow}>
               <Text style={styles.inputLabel}>Sobre você</Text>
               <Text style={[styles.bioCounterText, editBio.length >= 124 && { color: '#FF4444' }]}>
@@ -721,38 +761,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#121212',
   },
-  floatingNominateBtn: {
-    position: 'absolute',
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#181818',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#333',
-    zIndex: 10,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  floatingNominateText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
   gpsLocateBtn: {
     position: 'absolute',
     right: 16,
-    bottom: 220,
+    bottom: 110,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#181818',
+    backgroundColor: 'rgba(20,20,20,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -762,7 +778,7 @@ const styles = StyleSheet.create({
   },
   cafeBottomSheet: {
     position: 'absolute',
-    bottom: 84,
+    bottom: 96,
     left: 14,
     right: 14,
     backgroundColor: '#181818',
@@ -875,31 +891,46 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  /* DOCK FLUTUANTE COM 5 ITENS */
   bottomTabBar: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    height: 64,
+    backgroundColor: 'rgba(18, 18, 18, 0.94)',
+    borderRadius: 32,
     flexDirection: 'row',
-    backgroundColor: '#121212',
-    borderTopWidth: 1,
-    borderTopColor: '#202020',
-    paddingTop: 8,
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#262626',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 20,
+    paddingHorizontal: 8,
   },
   tabButton: {
     alignItems: 'center',
+    justifyContent: 'center',
     flex: 1,
+    height: '100%',
   },
   tabLabel: {
-    color: '#737373',
-    fontSize: 11,
+    color: '#888',
+    fontSize: 10,
     fontWeight: '600',
     marginTop: 3,
   },
   tabLabelActive: {
     color: '#FF6B00',
-    fontWeight: '700',
+    fontWeight: '800',
   },
+  /* BOTÃO CENTRAL ELEVADO APENAS COM ÍCONE */
   mapCenterTabButton: {
-    top: -12,
+    top: -14,
     backgroundColor: '#FF6B00',
     width: 54,
     height: 54,
@@ -909,17 +940,13 @@ const styles = StyleSheet.create({
     shadowColor: '#FF6B00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 6,
+    borderWidth: 3,
+    borderColor: '#121212',
   },
   mapCenterActive: {
     backgroundColor: '#E05500',
-  },
-  mapCenterLabel: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 1,
   },
   modalOverlay: {
     flex: 1,

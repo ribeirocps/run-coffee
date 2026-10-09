@@ -67,8 +67,8 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
 
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>(initialList);
 
-  // Controle de Stories Agrupados
-  const [activeStoryGroup, setActiveStoryGroup] = useState<CommunityPost[] | null>(null);
+  // Navegação Contínua de Stories (Usuário Ativo + Story Ativo)
+  const [activeUserIndex, setActiveUserIndex] = useState<number | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState(0);
 
   // Modal de Comentários
@@ -102,24 +102,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         return item;
       })
     );
-
-    if (activeStoryGroup) {
-      setActiveStoryGroup((prev) =>
-        prev
-          ? prev.map((item) => {
-              if (item.id === postId) {
-                const nextLiked = !item.hasLiked;
-                return {
-                  ...item,
-                  hasLiked: nextLiked,
-                  likes: nextLiked ? item.likes + 1 : Math.max(0, item.likes - 1),
-                };
-              }
-              return item;
-            })
-          : null
-      );
-    }
   };
 
   // Abrir Gaveta de Comentários
@@ -151,21 +133,10 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     );
 
     setCurrentPostForComments((prev) => (prev ? { ...prev, comments: updatedComments } : null));
-
-    if (activeStoryGroup) {
-      setActiveStoryGroup((prev) =>
-        prev
-          ? prev.map((p) =>
-              p.id === currentPostForComments.id ? { ...p, comments: updatedComments } : p
-            )
-          : null
-      );
-    }
-
     setNewCommentText('');
   };
 
- // Compartilhamento Inteligente (Sem link feio de arquivo local)
+  // Compartilhamento Inteligente
   const handleSmartShare = (post: CommunityPost) => {
     const activityInfo = post.distance ? `📍 ${post.distance} (${post.pace || 'Rolê Urbano'})\n` : '';
     const shareMessage = `☕ *RunCoffee Clube Campinas*\n\n*${post.userName}* marcou presença no *${post.cafeName}*!\n\n"${post.text}"\n\n${activityInfo}📲 Baixe o app RunCoffee e venha explorar os cafés especiais de Campinas!`;
@@ -179,14 +150,9 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             text: '💬 WhatsApp (Mensagem Formatada)',
             onPress: async () => {
               try {
-                // Se for imagem pública da web, podemos manter o link; se for foto do celular (file://), NÃO exibe o caminho
                 const isWebUrl = post.image && post.image.startsWith('http');
                 const textToSend = isWebUrl ? `${shareMessage}\n\n📸 ${post.image}` : shareMessage;
-
-                await Share.share({
-                  title: 'RunCoffee Clube',
-                  message: textToSend,
-                });
+                await Share.share({ title: 'RunCoffee Clube', message: textToSend });
               } catch (e) {
                 console.log(e);
               }
@@ -216,10 +182,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         ]
       );
     } else {
-      Share.share({
-        title: 'RunCoffee Clube',
-        message: shareMessage,
-      });
+      Share.share({ title: 'RunCoffee Clube', message: shareMessage });
     }
   };
 
@@ -289,12 +252,13 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     Alert.alert('Publicado!', 'Seu story foi adicionado à sua caixinha!');
   };
 
-  // Stories do usuário logado
+  // ========================================================
+  // AGRUPAMENTO UNIFICADO PARA NAVEGAÇÃO CONTÍNUA
+  // ========================================================
   const myStories = feedPosts.filter(
     (p) => p.userName === userName || p.userHandle === '@voce' || p.id.startsWith('story-')
   );
 
-  // Stories dos outros membros agrupados
   const otherUsersMap = new Map<string, CommunityPost[]>();
   feedPosts.forEach((post) => {
     const isMe = post.userName === userName || post.userHandle === '@voce' || post.id.startsWith('story-');
@@ -311,22 +275,44 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     stories: userPosts,
   }));
 
-  const currentStory = activeStoryGroup ? activeStoryGroup[activeStoryIndex] : null;
+  // Lista sequencial completa de grupos de stories
+  const allStoryGroups = [
+    ...(myStories.length > 0
+      ? [{ userName, avatar: userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80', stories: myStories }]
+      : []),
+    ...otherUsersList,
+  ];
 
+  const currentGroup = activeUserIndex !== null ? allStoryGroups[activeUserIndex] : null;
+  const currentStory = currentGroup ? currentGroup.stories[activeStoryIndex] : null;
+
+  // Avançar Story (Se acabar os deste usuário, PULA PARA O PRÓXIMO USUÁRIO!)
   const handleNextStory = () => {
-    if (!activeStoryGroup) return;
-    if (activeStoryIndex < activeStoryGroup.length - 1) {
+    if (activeUserIndex === null || !currentGroup) return;
+
+    if (activeStoryIndex < currentGroup.stories.length - 1) {
       setActiveStoryIndex(activeStoryIndex + 1);
+    } else if (activeUserIndex < allStoryGroups.length - 1) {
+      // Pula para o primeiro story do amigo seguinte!
+      setActiveUserIndex(activeUserIndex + 1);
+      setActiveStoryIndex(0);
     } else {
-      setActiveStoryGroup(null);
+      // Chegou no final de todos os stories de todos os membros
+      setActiveUserIndex(null);
       setActiveStoryIndex(0);
     }
   };
 
+  // Voltar Story (Se estiver no primeiro, volta para o anterior do amigo de trás)
   const handlePrevStory = () => {
-    if (!activeStoryGroup) return;
+    if (activeUserIndex === null || !currentGroup) return;
+
     if (activeStoryIndex > 0) {
       setActiveStoryIndex(activeStoryIndex - 1);
+    } else if (activeUserIndex > 0) {
+      const prevGroup = allStoryGroups[activeUserIndex - 1];
+      setActiveUserIndex(activeUserIndex - 1);
+      setActiveStoryIndex(prevGroup.stories.length - 1);
     }
   };
 
@@ -355,7 +341,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
                 activeOpacity={0.8}
                 onPress={() => {
                   if (myStories.length > 0) {
-                    setActiveStoryGroup(myStories);
+                    setActiveUserIndex(0);
                     setActiveStoryIndex(0);
                   } else {
                     setIsCreateStoryVisible(true);
@@ -386,29 +372,32 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             </View>
 
             {/* Demais membros */}
-            {otherUsersList.map((user) => (
-              <TouchableOpacity
-                key={`user-story-${user.userName}`}
-                style={styles.storyItem}
-                activeOpacity={0.8}
-                onPress={() => {
-                  setActiveStoryGroup(user.stories);
-                  setActiveStoryIndex(0);
-                }}
-              >
-                <View style={[styles.storyRing, styles.activeStoryRing]}>
-                  <Image source={{ uri: user.avatar }} style={styles.storyAvatar} />
-                  {user.stories.length > 1 && (
-                    <View style={styles.countBadge}>
-                      <Text style={styles.countBadgeText}>{user.stories.length}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.storyName} numberOfLines={1}>
-                  {user.userName.split(' ')[0]}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {otherUsersList.map((user, idx) => {
+              const targetIndex = myStories.length > 0 ? idx + 1 : idx;
+              return (
+                <TouchableOpacity
+                  key={`user-story-${user.userName}`}
+                  style={styles.storyItem}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setActiveUserIndex(targetIndex);
+                    setActiveStoryIndex(0);
+                  }}
+                >
+                  <View style={[styles.storyRing, styles.activeStoryRing]}>
+                    <Image source={{ uri: user.avatar }} style={styles.storyAvatar} />
+                    {user.stories.length > 1 && (
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeText}>{user.stories.length}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.storyName} numberOfLines={1}>
+                    {user.userName.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       </View>
@@ -602,17 +591,17 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         </View>
       </Modal>
 
-      {/* MODAL DE STORIES EM SEQUÊNCIA (FOTO LIMPA SEM POLUIÇÃO VISUAL) */}
+      {/* MODAL DE STORIES EM SEQUÊNCIA CONTÍNUA ENTRE MEMBROS */}
       <Modal
-        visible={!!activeStoryGroup && activeStoryGroup.length > 0}
+        visible={activeUserIndex !== null && !!currentStory}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveStoryGroup(null)}
+        onRequestClose={() => setActiveUserIndex(null)}
       >
         <View style={styles.storyModalOverlay}>
-          {/* BARRINHAS SEGMENTADAS NO TOPO */}
+          {/* BARRINHAS SEGMENTADAS DO AUTOR ATUAL */}
           <View style={styles.storyTopBar}>
-            {activeStoryGroup?.map((_, idx) => (
+            {currentGroup?.stories.map((_, idx) => (
               <View
                 key={`progress-${idx}`}
                 style={[
@@ -626,11 +615,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
           {/* Cabeçalho */}
           <View style={styles.storyModalHeader}>
             <Image
-              source={{
-                uri:
-                  currentStory?.avatar ||
-                  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-              }}
+              source={{ uri: currentGroup?.avatar }}
               style={styles.storyModalAvatar}
             />
             <View style={{ flex: 1, marginLeft: 10 }}>
@@ -641,14 +626,14 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             </View>
             <TouchableOpacity
               style={styles.storyCloseBtn}
-              onPress={() => setActiveStoryGroup(null)}
+              onPress={() => setActiveUserIndex(null)}
               hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
             >
               <Feather name="x" size={24} color="#FFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Área Central: Foto limpa com zonas de toque para avançar/voltar */}
+          {/* Área Central: Foto limpa com zonas de toque para avançar/voltar de história ou autor */}
           <View style={styles.storyMainArea}>
             {currentStory?.image ? (
               <Image
@@ -664,7 +649,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               </View>
             )}
 
-            {/* Zonas de toque para avançar / retroceder */}
+            {/* Zonas de toque invisíveis */}
             <TouchableOpacity style={styles.touchLeftZone} onPress={handlePrevStory} activeOpacity={1} />
             <TouchableOpacity style={styles.touchRightZone} onPress={handleNextStory} activeOpacity={1} />
 
@@ -718,7 +703,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         </View>
       </Modal>
 
-      {/* GAVETA DE COMENTÁRIOS (ABRE LIMPA AO CLICAR EM COMENTAR) */}
+      {/* GAVETA DE COMENTÁRIOS */}
       <Modal
         visible={isCommentsModalVisible}
         animationType="slide"
@@ -742,7 +727,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Lista de Comentários */}
             <ScrollView style={styles.commentsList} showsVerticalScrollIndicator={false}>
               {currentPostForComments?.comments && currentPostForComments.comments.length > 0 ? (
                 currentPostForComments.comments.map((c) => (
@@ -766,7 +750,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               )}
             </ScrollView>
 
-            {/* Input para Comentar */}
             <View style={styles.commentInputRow}>
               <TextInput
                 style={styles.commentTextInput}
@@ -787,7 +770,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* MODAL DE FOTO EM TELA CHEIA */}
+      {/* VIEWER FOTO CHEIA */}
       <Modal
         visible={!!enlargedImage}
         transparent
