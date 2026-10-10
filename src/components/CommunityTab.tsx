@@ -29,6 +29,7 @@ interface CommunityTabProps {
   onAddPost?: (post: any) => void;
   userAvatar?: string;
   userName?: string;
+  isPrivateProfile?: boolean; // Modo Fantasma 👻
   cafes?: Cafe[];
   [key: string]: any;
 }
@@ -58,6 +59,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
   onAddPost,
   userAvatar,
   userName = 'Você',
+  isPrivateProfile = false,
   cafes = INITIAL_CAFES,
 }) => {
   const initialList: CommunityPost[] = (Array.isArray(posts) ? posts : []).map((p) => ({
@@ -67,7 +69,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
 
   const [feedPosts, setFeedPosts] = useState<CommunityPost[]>(initialList);
 
-  // Navegação Contínua de Stories (Usuário Ativo + Story Ativo)
+  // Navegação Contínua de Stories
   const [activeUserIndex, setActiveUserIndex] = useState<number | null>(null);
   const [activeStoryIndex, setActiveStoryIndex] = useState(0);
 
@@ -79,7 +81,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
   // Modal de Foto em Tela Cheia do Feed
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
 
-  // Estados para Criar Novo Story
+  // Estados para Criar Novo Post / Story
   const [isCreateStoryVisible, setIsCreateStoryVisible] = useState(false);
   const [storyImageUri, setStoryImageUri] = useState<string | null>(null);
   const [storyText, setStoryText] = useState('');
@@ -87,7 +89,9 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
   const [isCustomCafe, setIsCustomCafe] = useState(false);
   const [customCafeName, setCustomCafeName] = useState('');
 
-  // Curtir com Cafezinho
+  // Destino da Publicação (Story, Feed ou Ambos)
+  const [publishDestination, setPublishDestination] = useState<'story' | 'feed' | 'both'>('story');
+
   const handleToggleLike = (postId: string) => {
     setFeedPosts((prev) =>
       prev.map((item) => {
@@ -104,13 +108,11 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     );
   };
 
-  // Abrir Gaveta de Comentários
   const handleOpenComments = (post: CommunityPost) => {
     setCurrentPostForComments(post);
     setIsCommentsModalVisible(true);
   };
 
-  // Enviar Novo Comentário
   const handleSendComment = () => {
     if (!newCommentText.trim() || !currentPostForComments) return;
 
@@ -136,7 +138,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     setNewCommentText('');
   };
 
-  // Compartilhamento Inteligente
   const handleSmartShare = (post: CommunityPost) => {
     const activityInfo = post.distance ? `📍 ${post.distance} (${post.pace || 'Rolê Urbano'})\n` : '';
     const shareMessage = `☕ *RunCoffee Clube Campinas*\n\n*${post.userName}* marcou presença no *${post.cafeName}*!\n\n"${post.text}"\n\n${activityInfo}📲 Baixe o app RunCoffee e venha explorar os cafés especiais de Campinas!`;
@@ -186,7 +187,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     }
   };
 
-  // Escolher foto 9:16 da galeria
   const handlePickStoryImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -204,10 +204,9 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     }
   };
 
-  // Publicar o Story
   const handlePublishStory = () => {
     if (!storyText.trim() && !storyImageUri) {
-      Alert.alert('Aviso', 'Adicione uma foto ou uma mensagem para o seu story!');
+      Alert.alert('Aviso', 'Adicione uma foto ou uma mensagem!');
       return;
     }
 
@@ -216,7 +215,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
       : selectedCafeName;
 
     const newPost: CommunityPost = {
-      id: `story-${Date.now()}`,
+      id: `my-story-${Date.now()}`,
       userName,
       userHandle: '@voce',
       avatar:
@@ -224,12 +223,15 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
       timeAgo: 'agora mesmo',
       cafeName: finalCafe,
-      text: storyText.trim() || 'Café especial no Clube!',
+      text: storyText.trim() || 'Momento especial com café!',
       likes: 1,
       hasLiked: false,
       distance: 'Check-in',
       pace: 'Rolê Urbano',
       image: storyImageUri || undefined,
+      destination: publishDestination,
+      isStoryOnly: publishDestination === 'story',
+      isFeedOnly: publishDestination === 'feed',
       comments: [
         {
           id: `c-init-${Date.now()}`,
@@ -240,7 +242,27 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         },
       ],
     };
+// 1. Apenas os SEUS stories reais
+  const myStories = feedPosts.filter(
+    (p) =>
+      !p.isFeedOnly &&
+      (p.userName === userName || p.userHandle === '@voce' || p.id.startsWith('my-story-'))
+  );
 
+  // 2. Stories dos outros membros (Lucas, Mariana, Thiago, etc.)
+  const otherUsersMap = new Map<string, CommunityPost[]>();
+  feedPosts.forEach((post) => {
+    const isMe =
+      post.userName === userName ||
+      post.userHandle === '@voce' ||
+      post.id.startsWith('my-story-');
+    if (!isMe && !post.isFeedOnly) {
+      const existing = otherUsersMap.get(post.userName) || [];
+      existing.push(post);
+      otherUsersMap.set(post.userName, existing);
+    }
+  });
+  
     setFeedPosts([newPost, ...feedPosts]);
     if (onAddPost) onAddPost(newPost);
 
@@ -249,20 +271,29 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     setCustomCafeName('');
     setIsCustomCafe(false);
     setIsCreateStoryVisible(false);
-    Alert.alert('Publicado!', 'Seu story foi adicionado à sua caixinha!');
+
+    const feedbackMsg =
+      publishDestination === 'story'
+        ? 'Publicado apenas no seu Story (duração de 24h)!'
+        : publishDestination === 'feed'
+        ? 'Publicado no Feed permanente do Clube!'
+        : 'Publicado no seu Story e no Feed do Clube!';
+
+    Alert.alert('Sucesso! 🎉', feedbackMsg);
   };
 
-  // ========================================================
-  // AGRUPAMENTO UNIFICADO PARA NAVEGAÇÃO CONTÍNUA
-  // ========================================================
+  // Stories do usuário logado
   const myStories = feedPosts.filter(
-    (p) => p.userName === userName || p.userHandle === '@voce' || p.id.startsWith('story-')
+    (p) =>
+      !p.isFeedOnly &&
+      (p.userName === userName || p.userHandle === '@voce' || p.id.startsWith('post-') || p.id.startsWith('story-'))
   );
 
+  // Stories dos outros membros
   const otherUsersMap = new Map<string, CommunityPost[]>();
   feedPosts.forEach((post) => {
-    const isMe = post.userName === userName || post.userHandle === '@voce' || post.id.startsWith('story-');
-    if (!isMe) {
+    const isMe = post.userName === userName || post.userHandle === '@voce' || post.id.startsWith('post-') || post.id.startsWith('story-');
+    if (!isMe && !post.isFeedOnly) {
       const existing = otherUsersMap.get(post.userName) || [];
       existing.push(post);
       otherUsersMap.set(post.userName, existing);
@@ -275,7 +306,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
     stories: userPosts,
   }));
 
-  // Lista sequencial completa de grupos de stories
   const allStoryGroups = [
     ...(myStories.length > 0
       ? [{ userName, avatar: userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80', stories: myStories }]
@@ -286,24 +316,20 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
   const currentGroup = activeUserIndex !== null ? allStoryGroups[activeUserIndex] : null;
   const currentStory = currentGroup ? currentGroup.stories[activeStoryIndex] : null;
 
-  // Avançar Story (Se acabar os deste usuário, PULA PARA O PRÓXIMO USUÁRIO!)
   const handleNextStory = () => {
     if (activeUserIndex === null || !currentGroup) return;
 
     if (activeStoryIndex < currentGroup.stories.length - 1) {
       setActiveStoryIndex(activeStoryIndex + 1);
     } else if (activeUserIndex < allStoryGroups.length - 1) {
-      // Pula para o primeiro story do amigo seguinte!
       setActiveUserIndex(activeUserIndex + 1);
       setActiveStoryIndex(0);
     } else {
-      // Chegou no final de todos os stories de todos os membros
       setActiveUserIndex(null);
       setActiveStoryIndex(0);
     }
   };
 
-  // Voltar Story (Se estiver no primeiro, volta para o anterior do amigo de trás)
   const handlePrevStory = () => {
     if (activeUserIndex === null || !currentGroup) return;
 
@@ -315,6 +341,8 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
       setActiveStoryIndex(prevGroup.stories.length - 1);
     }
   };
+
+  const visibleFeedPosts = feedPosts.filter((p) => !p.isStoryOnly);
 
   return (
     <View style={styles.container}>
@@ -331,11 +359,11 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
           </View>
         </View>
 
-        {/* Stories Agrupados */}
+        {/* Stories Agrupados com Suporte a Modo Fantasma */}
         <View style={styles.storiesSection}>
           <Text style={styles.storiesSectionTitle}>Check-ins Recentes</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesScroll}>
-            {/* Caixinha: Seu Story */}
+            {/* Caixinha: Seu Story com Estilo 👻 */}
             <View style={styles.storyItem}>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -348,26 +376,38 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
                   }
                 }}
               >
-                <View style={[styles.storyRing, myStories.length > 0 ? styles.activeStoryRing : styles.myStoryRing]}>
+                <View
+                  style={[
+                    styles.storyRing,
+                    myStories.length > 0 ? styles.activeStoryRing : styles.myStoryRing,
+                    isPrivateProfile && styles.ghostStoryRing,
+                  ]}
+                >
                   <Image
                     source={{
                       uri:
                         userAvatar ||
                         'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
                     }}
-                    style={styles.storyAvatar}
+                    style={[styles.storyAvatar, isPrivateProfile && styles.ghostAvatarOpacity]}
                   />
+
+                  {/* Badge de Adicionar ou Apenas o 👻 */}
                   <TouchableOpacity
-                    style={styles.myStoryPlusBadge}
+                    style={[styles.myStoryPlusBadge, isPrivateProfile && styles.ghostBadgeBg]}
                     activeOpacity={0.8}
                     onPress={() => setIsCreateStoryVisible(true)}
                   >
-                    <Feather name="plus" size={13} color="#FFF" />
+                    {isPrivateProfile ? (
+                      <Text style={{ fontSize: 11 }}>👻</Text>
+                    ) : (
+                      <Feather name="plus" size={12} color="#FFF" />
+                    )}
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
               <Text style={styles.storyName} numberOfLines={1}>
-                {myStories.length > 0 ? `Você (${myStories.length})` : 'Seu Story'}
+                {isPrivateProfile ? 'Você 👻' : myStories.length > 0 ? `Você (${myStories.length})` : 'Seu Story'}
               </Text>
             </View>
 
@@ -404,7 +444,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
 
       {/* Feed de Posts */}
       <ScrollView contentContainerStyle={styles.feedContent} showsVerticalScrollIndicator={false}>
-        {feedPosts.map((item) => (
+        {visibleFeedPosts.map((item) => (
           <View key={item.id} style={styles.postCard}>
             <View style={styles.postHeader}>
               <Image source={{ uri: item.avatar }} style={styles.postAvatar} />
@@ -451,7 +491,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               </TouchableOpacity>
             ) : null}
 
-            {/* Ações do Feed */}
             <View style={styles.postActionsRow}>
               <TouchableOpacity
                 style={[styles.actionBtn, item.hasLiked && styles.actionBtnActive]}
@@ -491,7 +530,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         ))}
       </ScrollView>
 
-      {/* MODAL ADICIONAR AO STORY */}
+      {/* MODAL PUBLICAR */}
       <Modal
         visible={isCreateStoryVisible}
         animationType="slide"
@@ -501,13 +540,82 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         <View style={styles.createStoryModalBackdrop}>
           <View style={styles.createStoryModalCard}>
             <View style={styles.createStoryHeader}>
-              <Text style={styles.createStoryTitle}>Adicionar ao Story</Text>
+              <Text style={styles.createStoryTitle}>Compartilhar Momento</Text>
               <TouchableOpacity onPress={() => setIsCreateStoryVisible(false)}>
                 <Feather name="x" size={22} color="#FFF" />
               </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Onde quer compartilhar?</Text>
+              <View style={styles.destinationToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.destinationOption,
+                    publishDestination === 'story' && styles.destinationOptionActive,
+                  ]}
+                  onPress={() => setPublishDestination('story')}
+                >
+                  <Feather
+                    name="clock"
+                    size={14}
+                    color={publishDestination === 'story' ? '#FF6B00' : '#888'}
+                  />
+                  <Text
+                    style={[
+                      styles.destinationText,
+                      publishDestination === 'story' && styles.destinationTextActive,
+                    ]}
+                  >
+                    Apenas Story (24h)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.destinationOption,
+                    publishDestination === 'feed' && styles.destinationOptionActive,
+                  ]}
+                  onPress={() => setPublishDestination('feed')}
+                >
+                  <Feather
+                    name="grid"
+                    size={14}
+                    color={publishDestination === 'feed' ? '#FF6B00' : '#888'}
+                  />
+                  <Text
+                    style={[
+                      styles.destinationText,
+                      publishDestination === 'feed' && styles.destinationTextActive,
+                    ]}
+                  >
+                    Apenas Feed
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.destinationOption,
+                    publishDestination === 'both' && styles.destinationOptionActive,
+                  ]}
+                  onPress={() => setPublishDestination('both')}
+                >
+                  <Feather
+                    name="layers"
+                    size={14}
+                    color={publishDestination === 'both' ? '#FF6B00' : '#888'}
+                  />
+                  <Text
+                    style={[
+                      styles.destinationText,
+                      publishDestination === 'both' && styles.destinationTextActive,
+                    ]}
+                  >
+                    Story + Feed
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
                 style={styles.photoPickerBox}
                 activeOpacity={0.8}
@@ -518,7 +626,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
                 ) : (
                   <View style={styles.photoPickerPlaceholder}>
                     <Feather name="camera" size={32} color="#FF6B00" />
-                    <Text style={styles.photoPickerText}>Toque para foto vertical (9:16)</Text>
+                    <Text style={styles.photoPickerText}>Toque para foto (9:16)</Text>
                     <Text style={styles.photoPickerSub}>1080 x 1920 pixels</Text>
                   </View>
                 )}
@@ -591,7 +699,7 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         </View>
       </Modal>
 
-      {/* MODAL DE STORIES EM SEQUÊNCIA CONTÍNUA ENTRE MEMBROS */}
+      {/* MODAL DE STORIES EM SEQUÊNCIA CONTÍNUA */}
       <Modal
         visible={activeUserIndex !== null && !!currentStory}
         transparent
@@ -599,7 +707,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
         onRequestClose={() => setActiveUserIndex(null)}
       >
         <View style={styles.storyModalOverlay}>
-          {/* BARRINHAS SEGMENTADAS DO AUTOR ATUAL */}
           <View style={styles.storyTopBar}>
             {currentGroup?.stories.map((_, idx) => (
               <View
@@ -612,14 +719,13 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             ))}
           </View>
 
-          {/* Cabeçalho */}
           <View style={styles.storyModalHeader}>
-            <Image
-              source={{ uri: currentGroup?.avatar }}
-              style={styles.storyModalAvatar}
+  <Image
+    source={{ uri: currentStory?.avatar || currentGroup?.avatar }}
+    style={styles.storyModalAvatar}
             />
             <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.storyModalUserName}>{currentStory?.userName}</Text>
+    <Text style={styles.storyModalUserName}>{currentStory?.userName}</Text>
               <Text style={styles.storyModalSubtitle}>
                 {currentStory?.cafeName} • {currentStory?.timeAgo}
               </Text>
@@ -633,7 +739,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Área Central: Foto limpa com zonas de toque para avançar/voltar de história ou autor */}
           <View style={styles.storyMainArea}>
             {currentStory?.image ? (
               <Image
@@ -649,11 +754,9 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
               </View>
             )}
 
-            {/* Zonas de toque invisíveis */}
             <TouchableOpacity style={styles.touchLeftZone} onPress={handlePrevStory} activeOpacity={1} />
             <TouchableOpacity style={styles.touchRightZone} onPress={handleNextStory} activeOpacity={1} />
 
-            {/* Card inferior transparente com o texto do autor e as AÇÕES */}
             <View style={styles.storyBottomCard}>
               <View style={styles.storyBottomCafeRow}>
                 <Feather name="map-pin" size={14} color="#FF6B00" />
@@ -664,7 +767,6 @@ export const CommunityTab: React.FC<CommunityTabProps> = ({
                 <Text style={styles.storyBottomText}>{currentStory.text}</Text>
               ) : null}
 
-              {/* BARRA DE AÇÕES: CAFÉS (COM CONTAGEM), COMENTAR E COMPARTILHAR */}
               <View style={styles.storyActionsRow}>
                 <TouchableOpacity
                   style={[styles.storyActionBtn, currentStory?.hasLiked && styles.storyActionBtnActive]}
@@ -879,11 +981,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#444',
   },
+  ghostStoryRing: {
+    borderWidth: 2,
+    borderColor: '#7E57C2',
+    borderStyle: 'dashed',
+  },
   storyAvatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
     backgroundColor: '#222',
+  },
+  ghostAvatarOpacity: {
+    opacity: 0.45,
   },
   myStoryPlusBadge: {
     position: 'absolute',
@@ -897,6 +1007,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#141414',
+  },
+  ghostBadgeBg: {
+    backgroundColor: '#7E57C2',
   },
   countBadge: {
     position: 'absolute',
@@ -1046,8 +1159,6 @@ const styles = StyleSheet.create({
     color: '#FF6B00',
     fontWeight: '700',
   },
-
-  /* MODAL CRIAR STORY */
   createStoryModalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',
@@ -1073,9 +1184,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
+  destinationToggleRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 16,
+  },
+  destinationOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    backgroundColor: '#222',
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  destinationOptionActive: {
+    backgroundColor: 'rgba(255,107,0,0.15)',
+    borderColor: '#FF6B00',
+  },
+  destinationText: {
+    color: '#888',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  destinationTextActive: {
+    color: '#FF6B00',
+    fontWeight: '700',
+  },
   photoPickerBox: {
-    height: 220,
-    width: 124,
+    height: 200,
+    width: 120,
     backgroundColor: '#222',
     borderRadius: 14,
     justifyContent: 'center',
@@ -1170,8 +1312,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
   },
-
-  /* MODAL DE STORIES EM SEQUÊNCIA */
   storyModalOverlay: {
     flex: 1,
     backgroundColor: '#000',
@@ -1329,8 +1469,6 @@ const styles = StyleSheet.create({
     color: '#FF6B00',
     fontWeight: '700',
   },
-
-  /* MODAL DE COMENTÁRIOS */
   commentsBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.8)',
@@ -1442,8 +1580,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  /* VIEWER FOTO CHEIA */
   imageViewerBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.95)',

@@ -10,6 +10,7 @@ import {
   Modal,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -18,7 +19,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
-// Módulos organizados
 import {
   INITIAL_CAFES,
   INITIAL_CIRCUITS,
@@ -38,50 +38,43 @@ export default function RunCoffeeApp() {
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
 
-  // Navegação por Abas
   const [activeTab, setActiveTab] = useState<'mapa' | 'circuitos' | 'comunidade' | 'perfil'>('mapa');
 
-  // Dados do App
   const [cafes, setCafes] = useState<Cafe[]>(INITIAL_CAFES);
   const [circuits, setCircuits] = useState<Circuit[]>(INITIAL_CIRCUITS);
   const [posts, setPosts] = useState<CommunityPost[]>(INITIAL_POSTS);
 
-  // Perfil do Usuário
+  // Perfil do Usuário com Modo Privado
   const [userName, setUserName] = useState('Você');
   const [userAvatar, setUserAvatar] = useState('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80');
   const [userBio, setUserBio] = useState('Explorando cafés especiais e rolês urbanos em Campinas ☕✨');
+  const [isPrivateProfile, setIsPrivateProfile] = useState(false); // NOVO
   const [userKm, setUserKm] = useState(12.4);
   const [userVisits, setUserVisits] = useState(18);
   const [userCrowns, setUserCrowns] = useState(1);
   const [userMedals, setUserMedals] = useState(5);
   const [userCheckIns, setUserCheckIns] = useState<string[]>(['d-origem', 'container-cafe', 'abigail-coffee']);
 
-  // Localização
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-
-  // Seleção e Modais
   const [selectedCafe, setSelectedCafe] = useState<Cafe | null>(null);
 
-  // Modal Cortesia (Timer de 90s)
   const [isPerkModalVisible, setIsPerkModalVisible] = useState(false);
   const [perkTimer, setPerkTimer] = useState(90);
 
-  // Modal Tomada de Reinado
   const [isTakeoverModalVisible, setIsTakeoverModalVisible] = useState(false);
   const [newReinadoInfo, setNewReinadoInfo] = useState<{ cafeName: string; visits: number } | null>(null);
 
-  // Modal Indicar Cafeteria
   const [isNominateCafeVisible, setIsNominateCafeVisible] = useState(false);
   const [nominateName, setNominateName] = useState('');
   const [nominateAddress, setNominateAddress] = useState('');
 
-  // Modal Editar Perfil
+  // Modal Editar Perfil com Switch de Privacidade
   const [isEditProfileVisible, setIsEditProfileVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editAvatar, setEditAvatar] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editIsPrivateProfile, setEditIsPrivateProfile] = useState(false); // NOVO
 
-  // Carregar dados salvos do AsyncStorage
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -91,6 +84,7 @@ export default function RunCoffeeApp() {
           if (p.name) setUserName(p.name);
           if (p.avatar) setUserAvatar(p.avatar);
           if (p.bio) setUserBio(p.bio);
+          if (p.isPrivate !== undefined) setIsPrivateProfile(p.isPrivate);
           if (p.visits !== undefined) setUserVisits(p.visits);
           if (p.km !== undefined) setUserKm(p.km);
           if (p.crowns !== undefined) setUserCrowns(p.crowns);
@@ -102,7 +96,6 @@ export default function RunCoffeeApp() {
     loadData();
   }, []);
 
-  // Obter GPS do Usuário
   useEffect(() => {
     (async () => {
       try {
@@ -117,7 +110,6 @@ export default function RunCoffeeApp() {
     })();
   }, []);
 
-  // Timer regressivo da Cortesia (90s)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPerkModalVisible && perkTimer > 0) {
@@ -131,15 +123,14 @@ export default function RunCoffeeApp() {
     return () => clearInterval(interval);
   }, [isPerkModalVisible, perkTimer]);
 
-  // Abertura do Modal de Edição de Perfil
   const handleOpenEditProfile = () => {
     setEditName(userName);
     setEditAvatar(userAvatar);
     setEditBio(userBio);
+    setEditIsPrivateProfile(isPrivateProfile);
     setIsEditProfileVisible(true);
   };
 
-  // Salvar Perfil
   const handleSaveProfile = async () => {
     if (!editName.trim()) {
       Alert.alert('Aviso', 'O nome não pode ficar vazio.');
@@ -148,6 +139,7 @@ export default function RunCoffeeApp() {
     setUserName(editName.trim());
     setUserAvatar(editAvatar);
     setUserBio(editBio.trim());
+    setIsPrivateProfile(editIsPrivateProfile);
     setIsEditProfileVisible(false);
 
     try {
@@ -157,6 +149,7 @@ export default function RunCoffeeApp() {
           name: editName.trim(),
           avatar: editAvatar,
           bio: editBio.trim(),
+          isPrivate: editIsPrivateProfile,
           visits: userVisits,
           km: userKm,
           crowns: userCrowns,
@@ -167,7 +160,6 @@ export default function RunCoffeeApp() {
     }
   };
 
-  // Escolher Foto do Perfil
   const handlePickAvatar = async () => {
     try {
       const res = await ImagePicker.launchImageLibraryAsync({
@@ -184,7 +176,7 @@ export default function RunCoffeeApp() {
     }
   };
 
-  // Check-in com Geofence de 150m e Anti-cheat
+  // CHECK-IN CALIBRADO PARA 50 METROS (COM SUPORTE A MODO PRIVADO)
   const handleCheckInAttempt = async (cafe: Cafe) => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -195,10 +187,11 @@ export default function RunCoffeeApp() {
       const loc = await Location.getCurrentPositionAsync({});
       const distance = getDistanceInMeters(loc.coords.latitude, loc.coords.longitude, cafe.lat, cafe.lng);
 
-      if (distance > 150) {
+      // RAIO RIGOROSO DE 50 METROS
+      if (distance > 50) {
         Alert.alert(
           'Fora do Raio',
-          `Você está a cerca de ${Math.round(distance)}m do ${cafe.name}. Aproxime-se a menos de 150m para fazer check-in!`
+          `Você está a ${Math.round(distance)}m do ${cafe.name}. Aproxime-se a menos de 50m para confirmar presença no balcão!`
         );
         return;
       }
@@ -222,6 +215,16 @@ export default function RunCoffeeApp() {
     }
 
     const currentKingVisits = cafe.kingVisits || cafe.kingCheckins || 10;
+
+    // Se estiver em Modo Privado, salva para si mas não expõe publicamente como Rei
+    if (isPrivateProfile) {
+      Alert.alert(
+        '☕ Check-in Discreto Confirmado!',
+        `Sua visita no ${cafe.name} foi salva com sucesso no seu passaporte pessoal e não foi exposta no Clube.`
+      );
+      return;
+    }
+
     if (nextVisits > currentKingVisits) {
       nextCrowns += 1;
       setUserCrowns(nextCrowns);
@@ -239,13 +242,11 @@ export default function RunCoffeeApp() {
     }
   };
 
-  // Ativar Cortesia no Balcão
   const handleActivatePerk = () => {
     setPerkTimer(selectedCafe?.perkDurationSeconds || 90);
     setIsPerkModalVisible(true);
   };
 
-  // Enviar Indicação de Cafeteria
   const handleSendNomination = () => {
     if (!nominateName.trim()) {
       Alert.alert('Aviso', 'Por favor, informe o nome da cafeteria.');
@@ -257,7 +258,6 @@ export default function RunCoffeeApp() {
     setIsNominateCafeVisible(false);
   };
 
-  // HTML do Mapa com Nomes das Cafeterias Visíveis
   const mapHtml = `
     <!DOCTYPE html>
     <html>
@@ -357,8 +357,9 @@ export default function RunCoffeeApp() {
               : ''
           }
 
-          function centerOn(lat, lng) {
-            map.flyTo([lat, lng], 16, { animate: true, duration: 1.2 });
+          function centerOn(lat, lng, zoom) {
+            var targetZoom = zoom || 17;
+            map.flyTo([lat, lng], targetZoom, { animate: true, duration: 1.2 });
           }
         </script>
       </body>
@@ -390,20 +391,18 @@ export default function RunCoffeeApp() {
             onMessage={handleMapMessage}
           />
 
-          {/* Botão de Localização GPS */}
           <TouchableOpacity
             style={styles.gpsLocateBtn}
             activeOpacity={0.8}
             onPress={async () => {
               if (userLocation && webViewRef.current) {
-                webViewRef.current.injectJavaScript(`centerOn(${userLocation.lat}, ${userLocation.lng}); true;`);
+                webViewRef.current.injectJavaScript(`centerOn(${userLocation.lat}, ${userLocation.lng}, 16); true;`);
               }
             }}
           >
             <Feather name="crosshair" size={20} color="#FF6B00" />
           </TouchableOpacity>
 
-          {/* Card Flutuante da Cafeteria Selecionada */}
           {selectedCafe && (
             <View style={styles.cafeBottomSheet}>
               <View style={styles.sheetHandle} />
@@ -426,13 +425,11 @@ export default function RunCoffeeApp() {
                 </TouchableOpacity>
               </View>
 
-              {/* Cortesia / Benefício */}
               <View style={styles.sheetPerkBox}>
                 <Feather name="gift" size={16} color="#FF6B00" />
                 <Text style={styles.sheetPerkText}>{selectedCafe.activePerk}</Text>
               </View>
 
-              {/* Botões de Ação */}
               <View style={styles.sheetActionsRow}>
                 <TouchableOpacity
                   style={styles.checkInActionBtn}
@@ -452,7 +449,7 @@ export default function RunCoffeeApp() {
         </View>
       )}
 
-      {/* ABA 2: CIRCUITOS URBANOS */}
+      {/* ABA 2: CIRCUITOS */}
       {activeTab === 'circuitos' && (
         <CircuitsTab
           circuits={circuits}
@@ -462,15 +459,17 @@ export default function RunCoffeeApp() {
             if (found) {
               setSelectedCafe(found);
               setActiveTab('mapa');
-              if (webViewRef.current) {
-                webViewRef.current.injectJavaScript(`centerOn(${found.lat}, ${found.lng}); true;`);
-              }
+              setTimeout(() => {
+                if (webViewRef.current) {
+                  webViewRef.current.injectJavaScript(`centerOn(${found.lat}, ${found.lng}, 17); true;`);
+                }
+              }, 350);
             }
           }}
         />
       )}
 
-      {/* ABA 3: CLUBE RUNCOFFEE */}
+      {/* ABA 3: CLUBE */}
       {activeTab === 'comunidade' && (
         <CommunityTab
           posts={posts}
@@ -481,12 +480,13 @@ export default function RunCoffeeApp() {
         />
       )}
 
-      {/* ABA 4: PERFIL COM HISTÓRICO DE CAFÉS E SOBRE */}
+      {/* ABA 4: PERFIL */}
       {activeTab === 'perfil' && (
         <ProfileTab
           userName={userName}
           userAvatar={userAvatar}
           userBio={userBio}
+          isPrivateProfile={isPrivateProfile}
           userKm={userKm}
           userVisits={userVisits}
           userCrowns={userCrowns}
@@ -498,35 +498,23 @@ export default function RunCoffeeApp() {
           onSelectCafe={(cafe) => {
             setSelectedCafe(cafe);
             setActiveTab('mapa');
-            // Delay seguro para o mapa renderizar na tela antes da animação de voo
             setTimeout(() => {
               if (webViewRef.current) {
-                webViewRef.current.injectJavaScript(`centerOn(${cafe.lat}, ${cafe.lng}); true;`);
+                webViewRef.current.injectJavaScript(`centerOn(${cafe.lat}, ${cafe.lng}, 17); true;`);
               }
             }, 350);
           }}
         />
       )}
 
-      {/* ======================================================== */}
-      {/* NOVO DOCK: + CAFETERIA / CIRCUITOS / MAPA / CLUBE / PERFIL */}
-      {/* ======================================================== */}
+      {/* DOCK INFERIOR (5 ITENS) */}
       <View style={[styles.bottomTabBar, { bottom: Math.max(insets.bottom, 16) }]}>
-        
-        {/* 1. + Cafeteria */}
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setIsNominateCafeVisible(true)}
-        >
+        <TouchableOpacity style={styles.tabButton} onPress={() => setIsNominateCafeVisible(true)}>
           <Feather name="plus-circle" size={19} color="#888" />
           <Text style={styles.tabLabel}>+ Cafeteria</Text>
         </TouchableOpacity>
 
-        {/* 2. Circuitos */}
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setActiveTab('circuitos')}
-        >
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('circuitos')}>
           <Feather
             name="compass"
             size={19}
@@ -537,23 +525,15 @@ export default function RunCoffeeApp() {
           </Text>
         </TouchableOpacity>
 
-        {/* 3. Mapa (Botão Central Elevado, APENAS O ÍCONE) */}
         <TouchableOpacity
-          style={[
-            styles.mapCenterTabButton,
-            activeTab === 'mapa' && styles.mapCenterActive,
-          ]}
+          style={[styles.mapCenterTabButton, activeTab === 'mapa' && styles.mapCenterActive]}
           onPress={() => setActiveTab('mapa')}
           activeOpacity={0.85}
         >
           <Feather name="map-pin" size={24} color="#FFF" />
         </TouchableOpacity>
 
-        {/* 4. Clube */}
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setActiveTab('comunidade')}
-        >
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('comunidade')}>
           <Feather
             name="users"
             size={19}
@@ -564,11 +544,7 @@ export default function RunCoffeeApp() {
           </Text>
         </TouchableOpacity>
 
-        {/* 5. Perfil */}
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setActiveTab('perfil')}
-        >
+        <TouchableOpacity style={styles.tabButton} onPress={() => setActiveTab('perfil')}>
           <Feather
             name="user"
             size={19}
@@ -580,11 +556,9 @@ export default function RunCoffeeApp() {
         </TouchableOpacity>
       </View>
 
-      {/* ======================================================== */}
-      {/* MODAIS NO NÍVEL RAIZ                                     */}
-      {/* ======================================================== */}
+      {/* MODAIS NO NÍVEL RAIZ */}
 
-      {/* 1. MODAL CORTESIA (TIMER 90S) */}
+      {/* 1. CORTESIA */}
       <Modal
         visible={isPerkModalVisible}
         transparent
@@ -617,7 +591,7 @@ export default function RunCoffeeApp() {
         </View>
       </Modal>
 
-      {/* 2. MODAL NOVO REI DA CASA */}
+      {/* 2. REINADO */}
       <Modal
         visible={isTakeoverModalVisible}
         transparent
@@ -644,7 +618,7 @@ export default function RunCoffeeApp() {
         </View>
       </Modal>
 
-      {/* 3. MODAL INDICAR CAFETERIA */}
+      {/* 3. INDICAR CAFETERIA */}
       <Modal
         visible={isNominateCafeVisible}
         transparent
@@ -685,7 +659,7 @@ export default function RunCoffeeApp() {
         </View>
       </Modal>
 
-      {/* 4. MODAL EDITAR PERFIL */}
+      {/* 4. EDITAR PERFIL COM SWITCH DE PRIVACIDADE */}
       <Modal
         visible={isEditProfileVisible}
         transparent
@@ -701,7 +675,6 @@ export default function RunCoffeeApp() {
               </TouchableOpacity>
             </View>
 
-            {/* Avatar */}
             <View style={styles.avatarEditRow}>
               <Image source={{ uri: editAvatar || userAvatar }} style={styles.editAvatarImage} />
               <TouchableOpacity style={styles.changePhotoBtn} onPress={handlePickAvatar}>
@@ -710,7 +683,6 @@ export default function RunCoffeeApp() {
               </TouchableOpacity>
             </View>
 
-            {/* Nome */}
             <Text style={styles.inputLabel}>Seu Nome ou Apelido</Text>
             <TextInput
               style={styles.modalInput}
@@ -720,7 +692,6 @@ export default function RunCoffeeApp() {
               placeholderTextColor="#666"
             />
 
-            {/* Campo SOBRE */}
             <View style={styles.bioHeaderRow}>
               <Text style={styles.inputLabel}>Sobre você</Text>
               <Text style={[styles.bioCounterText, editBio.length >= 124 && { color: '#FF4444' }]}>
@@ -737,7 +708,25 @@ export default function RunCoffeeApp() {
               maxLength={124}
             />
 
-            {/* Salvar */}
+            {/* INTERRUPTOR DO MODO DISCRETO / PRIVADO */}
+            <View style={styles.privacyBox}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <Feather name="shield" size={14} color="#FF6B00" />
+                  <Text style={styles.privacyTitle}>Modo Discreto (Privado)</Text>
+                </View>
+                <Text style={styles.privacyDesc}>
+                  Seus check-ins ficam salvos apenas para você e não aparecem no feed público do Clube.
+                </Text>
+              </View>
+              <Switch
+                trackColor={{ false: '#333', true: '#FF6B00' }}
+                thumbColor={editIsPrivateProfile ? '#FFF' : '#888'}
+                value={editIsPrivateProfile}
+                onValueChange={setEditIsPrivateProfile}
+              />
+            </View>
+
             <TouchableOpacity style={styles.saveProfileBtn} onPress={handleSaveProfile}>
               <Text style={styles.saveProfileText}>Salvar Alterações</Text>
             </TouchableOpacity>
@@ -891,7 +880,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  /* DOCK FLUTUANTE COM 5 ITENS */
   bottomTabBar: {
     position: 'absolute',
     left: 14,
@@ -928,7 +916,6 @@ const styles = StyleSheet.create({
     color: '#FF6B00',
     fontWeight: '800',
   },
-  /* BOTÃO CENTRAL ELEVADO APENAS COM ÍCONE */
   mapCenterTabButton: {
     top: -14,
     backgroundColor: '#FF6B00',
@@ -1163,12 +1150,32 @@ const styles = StyleSheet.create({
     minHeight: 70,
     textAlignVertical: 'top',
   },
+  privacyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#222',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginVertical: 14,
+  },
+  privacyTitle: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  privacyDesc: {
+    color: '#888',
+    fontSize: 11,
+    lineHeight: 15,
+  },
   saveProfileBtn: {
     backgroundColor: '#FF6B00',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 8,
   },
   saveProfileText: {
     color: '#FFF',

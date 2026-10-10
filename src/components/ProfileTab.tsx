@@ -18,6 +18,7 @@ interface ProfileTabProps {
   userName?: string;
   userAvatar?: string;
   userBio?: string;
+  isPrivateProfile?: boolean;
   userKm?: number;
   userVisits?: number;
   userCrowns?: number;
@@ -39,6 +40,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   userName = 'Você',
   userAvatar,
   userBio = 'Explorando os melhores cafés especiais e rolês urbanos de Campinas ☕✨',
+  isPrivateProfile = false,
   userKm = 12.4,
   userVisits = 18,
   userCrowns = 1,
@@ -53,14 +55,11 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'cafes' | 'conquistas'>('cafes');
 
-  // Nível do usuário
   const levelData = calculateUserLevel(userVisits);
   const levelTitle = typeof levelData === 'string' ? levelData : levelData?.title || 'Coffee Hunter';
 
-  // Verifica se o usuário tem Story ativo nas últimas 24h
-  const hasActiveStory = true; // Simulado ativo para o perfil; pode ser ligado a userPosts.length > 0
+  const hasActiveStory = true;
 
-  // Histórico de cafeterias visitadas ordenadas pela MAIS RECENTE primeiro
   const visitedCafesList = [
     {
       ...cafes.find((c) => c.id === 'd-origem') || cafes[0],
@@ -85,7 +84,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     },
   ];
 
-  // Medalhas
   const defaultMedals = [
     { id: '1', title: 'Primeiro Gole', icon: '☕', desc: '1º check-in confirmado em Campinas', unlocked: userVisits >= 1 },
     { id: '2', title: 'Rei da Colina', icon: '👑', desc: 'Conquistou o Reinado de um café', unlocked: userCrowns >= 1 },
@@ -108,39 +106,65 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           )}
         </View>
 
-        {/* Card do Usuário com Borda de Story de 24h */}
+        {/* Card do Usuário */}
         <View style={styles.userCard}>
           <TouchableOpacity
             style={styles.avatarContainer}
             activeOpacity={0.8}
             onPress={() => onOpenStory && onOpenStory({ userName, avatar: userAvatar })}
           >
-            <View style={[styles.avatarRing, hasActiveStory && styles.avatarRingActive]}>
+            <View
+              style={[
+                styles.avatarRing,
+                hasActiveStory && !isPrivateProfile && styles.avatarRingActive,
+                isPrivateProfile && styles.avatarRingGhost,
+              ]}
+            >
               <Image
                 source={{
                   uri:
                     userAvatar ||
                     'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
                 }}
-                style={styles.avatar}
+                style={[styles.avatar, isPrivateProfile && styles.avatarGhostOpacity]}
               />
             </View>
-            {hasActiveStory && (
+
+            {/* Tag do Avatar: Apenas 👻 se privado, ou STORY */}
+            {isPrivateProfile ? (
+              <View style={styles.ghostTagBadge}>
+                <Text style={styles.ghostTagBadgeEmoji}>👻</Text>
+              </View>
+            ) : hasActiveStory ? (
               <View style={styles.storyTagBadge}>
                 <Text style={styles.storyTagBadgeText}>STORY</Text>
               </View>
-            )}
+            ) : null}
           </TouchableOpacity>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{userName}</Text>
-            <View style={styles.levelBadge}>
-              <Feather name="shield" size={12} color="#FF6B00" />
-              <Text style={styles.levelBadgeText}>{levelTitle.toUpperCase()}</Text>
+          {/* Dados do Usuário com Opacidade se Fantasma */}
+          <View style={[styles.userInfo, isPrivateProfile && styles.userInfoGhost]}>
+            <View style={styles.nameRow}>
+              <Text style={styles.userName}>{userName}</Text>
             </View>
 
-            {/* Bio do Usuário (Até 124 caracteres) */}
-            <Text style={styles.userBioText} numberOfLines={3}>
+            {/* Badges: Nível e apenas o 👻 */}
+            <View style={styles.badgesRow}>
+              <View style={[styles.levelBadge, isPrivateProfile && styles.levelBadgeGhost]}>
+                <Feather name="shield" size={12} color={isPrivateProfile ? '#AAA' : '#FF6B00'} />
+                <Text style={[styles.levelBadgeText, isPrivateProfile && { color: '#AAA' }]}>
+                  {levelTitle.toUpperCase()}
+                </Text>
+              </View>
+
+              {isPrivateProfile && (
+                <View style={styles.ghostPill}>
+                  <Text style={styles.ghostEmoji}>👻</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.userBioText, isPrivateProfile && styles.userBioGhost]} numberOfLines={3}>
               {userBio}
             </Text>
           </View>
@@ -206,10 +230,9 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </View>
       </View>
 
-      {/* Conteúdo */}
+      {/* Conteúdo Rolável */}
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {activeSubTab === 'cafes' ? (
-          /* ABA MEUS CAFÉS (Com link direto para o mapa) */
           <View style={styles.cafesSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Histórico de Frequência</Text>
@@ -251,7 +274,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       )}
                     </View>
 
-                    {/* Endereço e Data da Última Visita */}
                     <View style={styles.cafeSubInfoRow}>
                       <Text style={styles.cafeAddress} numberOfLines={1}>
                         {cafe.address?.split('-')[1]?.trim() || 'Cambuí'}
@@ -260,7 +282,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       <Text style={styles.lastVisitDateText}>{cafe.lastVisitLabel}</Text>
                     </View>
 
-                    {/* Contador de Visitas e Status do Benefício */}
                     <View style={styles.visitsBadgeRow}>
                       <View style={styles.visitsBadge}>
                         <Feather name="check-circle" size={13} color="#FF6B00" />
@@ -281,7 +302,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                       )}
                     </View>
 
-                    {/* Barra de Fidelidade */}
                     <View style={styles.perkBarBg}>
                       <View
                         style={[
@@ -299,7 +319,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             })}
           </View>
         ) : (
-          /* ABA CONQUISTAS */
           <View style={styles.medalsSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Medalhas do Clube</Text>
@@ -396,11 +415,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FF6B00',
   },
+  avatarRingGhost: {
+    borderWidth: 2,
+    borderColor: '#7E57C2',
+    borderStyle: 'dashed',
+  },
   avatar: {
     width: 58,
     height: 58,
     borderRadius: 29,
     backgroundColor: '#222',
+  },
+  avatarGhostOpacity: {
+    opacity: 0.45,
   },
   storyTagBadge: {
     position: 'absolute',
@@ -419,13 +446,44 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  /* TAG APENAS COM 👻 (SEM TEXTO) */
+  ghostTagBadge: {
+    position: 'absolute',
+    bottom: -4,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(20, 15, 30, 0.95)',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7E57C2',
+  },
+  ghostTagBadgeEmoji: {
+    fontSize: 12,
+  },
   userInfo: {
     flex: 1,
+  },
+  userInfoGhost: {
+    opacity: 0.65,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   userName: {
     color: '#FFF',
     fontSize: 18,
     fontWeight: '800',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 6,
   },
   levelBadge: {
     flexDirection: 'row',
@@ -435,9 +493,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    alignSelf: 'flex-start',
-    marginTop: 4,
-    marginBottom: 6,
+  },
+  levelBadgeGhost: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   levelBadgeText: {
     color: '#FF6B00',
@@ -445,10 +503,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  /* PÍLULA APENAS COM 👻 (SEM TEXTO) */
+  ghostPill: {
+    backgroundColor: 'rgba(126, 87, 194, 0.2)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(126, 87, 194, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ghostEmoji: {
+    fontSize: 12,
+  },
   userBioText: {
     color: '#AAA',
     fontSize: 12,
     lineHeight: 17,
+  },
+  userBioGhost: {
+    color: '#888',
+    fontStyle: 'italic',
   },
   statsRow: {
     flexDirection: 'row',
