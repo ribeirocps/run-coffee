@@ -782,4 +782,36 @@ const styles = StyleSheet.create({
   medalStatusUnlocked: {
     color: '#4CAF50',
   },
+  /* ANEL FANTASMA PRATA/CINZA QUASE BRANCO */
+  avatarRingGhost: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0', // Cinza quase branco
+    borderStyle: 'dashed',
+  },
+  /* TAG DO AVATAR NO PERFIL */
+  ghostTagBadge: {
+    position: 'absolute',
+    bottom: -4,
+    alignSelf: 'center',
+    backgroundColor: '#222222',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0', // Borda cinza clara
+  },
+
+  /* PÍLULA AO LADO DO NÍVEL */
+  ghostPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

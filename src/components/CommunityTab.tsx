@@ -1599,4 +1599,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '80%',
   },
+  /* ANEL FANTASMA NOS STORIES DO CLUBE */
+  ghostStoryRing: {
+    borderWidth: 2,
+    borderColor: '#E0E0E0', // Cinza quase branco
+    borderStyle: 'dashed',
+  },
+
+  /* BADGE DO CANTINHO DO STORY */
+  ghostBadgeBg: {
+    backgroundColor: '#262626',
+    borderWidth: 1.5,
+    borderColor: '#E0E0E0',
+  },
 });
